@@ -1,0 +1,13 @@
+# Firebase local state and logs
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# macOS
+.DS_Store

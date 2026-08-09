@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "Simply Schedule",
+    "slug": "simply-schedule",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "simplyschedule",
+    "userInterfaceStyle": "automatic",
+    "platforms": ["ios"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.codeflight.simplyschedule",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "router": {}
+    }
+  }
+}

@@ -1,0 +1,167 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function validTask(data) {
+      return data.keys().hasAll([
+          'title',
+          'notes',
+          'status',
+          'parentId',
+          'dueAt',
+          'completedAt',
+          'position',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'title',
+          'notes',
+          'status',
+          'parentId',
+          'dueAt',
+          'completedAt',
+          'position',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.title is string
+        && data.title.size() > 0
+        && data.title.size() <= 200
+        && data.notes is string
+        && data.notes.size() <= 5000
+        && data.status in ['open', 'completed']
+        && (data.parentId == null || data.parentId is string)
+        && (data.dueAt == null || data.dueAt is timestamp)
+        && (data.completedAt == null || data.completedAt is timestamp)
+        && data.position is number
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function validTermination(data) {
+      return data.keys().hasAll(['type', 'until', 'count'])
+        && data.keys().hasOnly(['type', 'until', 'count'])
+        && data.type in ['never', 'onDate', 'afterOccurrences']
+        && (data.until == null || data.until is timestamp)
+        && (data.count == null || data.count is int)
+        && (
+          (data.type == 'never' && data.until == null && data.count == null)
+          || (data.type == 'onDate' && data.until is timestamp && data.count == null)
+          || (data.type == 'afterOccurrences' && data.until == null && data.count is int && data.count > 0)
+        );
+    }
+
+    function validRecurrence(data) {
+      return data.keys().hasAll([
+          'frequency',
+          'interval',
+          'daysOfWeek',
+          'dayOfMonth',
+          'termination'
+        ])
+        && data.keys().hasOnly([
+          'frequency',
+          'interval',
+          'daysOfWeek',
+          'dayOfMonth',
+          'termination'
+        ])
+        && data.frequency in ['daily', 'weekly', 'monthly', 'yearly']
+        && data.interval is int
+        && data.interval > 0
+        && data.interval <= 99
+        && (
+          data.daysOfWeek == null
+          || (data.daysOfWeek is list && data.daysOfWeek.size() > 0 && data.daysOfWeek.size() <= 7)
+        )
+        && (
+          data.dayOfMonth == null
+          || (data.dayOfMonth is int && data.dayOfMonth >= 1 && data.dayOfMonth <= 31)
+        )
+        && data.termination is map
+        && validTermination(data.termination)
+        && (data.frequency != 'weekly' || data.daysOfWeek != null)
+        && (data.frequency != 'monthly' || data.dayOfMonth != null);
+    }
+
+    function validEvent(data) {
+      return data.keys().hasAll([
+          'title',
+          'notes',
+          'kind',
+          'startsAt',
+          'endsAt',
+          'allDay',
+          'timeZone',
+          'recurrence',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'title',
+          'notes',
+          'kind',
+          'startsAt',
+          'endsAt',
+          'allDay',
+          'timeZone',
+          'recurrence',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.title is string
+        && data.title.size() > 0
+        && data.title.size() <= 200
+        && data.notes is string
+        && data.notes.size() <= 5000
+        && data.kind in ['single', 'repeating']
+        && data.startsAt is timestamp
+        && (data.endsAt == null || (data.endsAt is timestamp && data.endsAt >= data.startsAt))
+        && data.allDay is bool
+        && data.timeZone is string
+        && data.timeZone.size() > 0
+        && data.timeZone.size() <= 100
+        && (
+          (data.kind == 'single' && data.recurrence == null)
+          || (data.kind == 'repeating' && data.recurrence is map && validRecurrence(data.recurrence))
+        )
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId);
+      allow delete: if false;
+
+      match /tasks/{taskId} {
+        allow read, delete: if isOwner(userId);
+        allow create: if isOwner(userId) && validTask(request.resource.data);
+        allow update: if isOwner(userId)
+          && validTask(request.resource.data)
+          && request.resource.data.createdAt == resource.data.createdAt;
+      }
+
+      match /events/{eventId} {
+        allow read, delete: if isOwner(userId);
+        allow create: if isOwner(userId) && validEvent(request.resource.data);
+        allow update: if isOwner(userId)
+          && validEvent(request.resource.data)
+          && request.resource.data.createdAt == resource.data.createdAt;
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
