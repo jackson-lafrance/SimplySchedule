@@ -60,37 +60,113 @@ service cloud.firestore {
         );
     }
 
+    function validDaysOfWeek(data) {
+      return data == null
+        || (
+          data is list
+          && data.size() > 0
+          && data.size() <= 7
+          && (data.size() < 1 || (data[0] is int && data[0] >= 0 && data[0] <= 6))
+          && (data.size() < 2 || (data[1] is int && data[1] >= 0 && data[1] <= 6))
+          && (data.size() < 3 || (data[2] is int && data[2] >= 0 && data[2] <= 6))
+          && (data.size() < 4 || (data[3] is int && data[3] >= 0 && data[3] <= 6))
+          && (data.size() < 5 || (data[4] is int && data[4] >= 0 && data[4] <= 6))
+          && (data.size() < 6 || (data[5] is int && data[5] >= 0 && data[5] <= 6))
+          && (data.size() < 7 || (data[6] is int && data[6] >= 0 && data[6] <= 6))
+        );
+    }
+
+    function validRecurrenceSelectors(data) {
+      return (
+          data.frequency in ['hourly', 'daily']
+          && data.daysOfWeek == null
+          && data.dayOfMonth == null
+          && data.weekOfMonth == null
+          && data.monthOfYear == null
+        )
+        || (
+          data.frequency == 'weekly'
+          && data.daysOfWeek != null
+          && data.dayOfMonth == null
+          && data.weekOfMonth == null
+          && data.monthOfYear == null
+        )
+        || (
+          data.frequency == 'monthly'
+          && data.monthOfYear == null
+          && (
+            (
+              data.dayOfMonth != null
+              && data.weekOfMonth == null
+              && data.daysOfWeek == null
+            )
+            || (
+              data.dayOfMonth == null
+              && data.weekOfMonth != null
+              && data.daysOfWeek != null
+            )
+          )
+        )
+        || (
+          data.frequency == 'yearly'
+          && data.monthOfYear != null
+          && (
+            (
+              data.dayOfMonth != null
+              && data.weekOfMonth == null
+              && data.daysOfWeek == null
+            )
+            || (
+              data.dayOfMonth == null
+              && data.weekOfMonth != null
+              && data.daysOfWeek != null
+            )
+          )
+        );
+    }
+
     function validRecurrence(data) {
       return data.keys().hasAll([
+          'version',
           'frequency',
           'interval',
           'daysOfWeek',
           'dayOfMonth',
+          'weekOfMonth',
+          'monthOfYear',
           'termination'
         ])
         && data.keys().hasOnly([
+          'version',
           'frequency',
           'interval',
           'daysOfWeek',
           'dayOfMonth',
+          'weekOfMonth',
+          'monthOfYear',
           'termination'
         ])
-        && data.frequency in ['daily', 'weekly', 'monthly', 'yearly']
+        && data.version == 1
+        && data.frequency in ['hourly', 'daily', 'weekly', 'monthly', 'yearly']
         && data.interval is int
         && data.interval > 0
         && data.interval <= 99
-        && (
-          data.daysOfWeek == null
-          || (data.daysOfWeek is list && data.daysOfWeek.size() > 0 && data.daysOfWeek.size() <= 7)
-        )
+        && validDaysOfWeek(data.daysOfWeek)
         && (
           data.dayOfMonth == null
-          || (data.dayOfMonth is int && data.dayOfMonth >= 1 && data.dayOfMonth <= 31)
+          || (data.dayOfMonth is int && (data.dayOfMonth == -1 || (data.dayOfMonth >= 1 && data.dayOfMonth <= 31)))
+        )
+        && (
+          data.weekOfMonth == null
+          || (data.weekOfMonth is int && (data.weekOfMonth == -1 || (data.weekOfMonth >= 1 && data.weekOfMonth <= 5)))
+        )
+        && (
+          data.monthOfYear == null
+          || (data.monthOfYear is int && data.monthOfYear >= 1 && data.monthOfYear <= 12)
         )
         && data.termination is map
         && validTermination(data.termination)
-        && (data.frequency != 'weekly' || data.daysOfWeek != null)
-        && (data.frequency != 'monthly' || data.dayOfMonth != null);
+        && validRecurrenceSelectors(data);
     }
 
     function validEvent(data) {
@@ -125,8 +201,11 @@ service cloud.firestore {
         && data.notes.size() <= 5000
         && data.kind in ['single', 'repeating']
         && data.startsAt is timestamp
-        && (data.endsAt == null || (data.endsAt is timestamp && data.endsAt >= data.startsAt))
         && data.allDay is bool
+        && (
+          (data.allDay && data.endsAt is timestamp && data.endsAt > data.startsAt)
+          || (!data.allDay && (data.endsAt == null || (data.endsAt is timestamp && data.endsAt > data.startsAt)))
+        )
         && data.timeZone is string
         && data.timeZone.size() > 0
         && data.timeZone.size() <= 100

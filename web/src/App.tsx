@@ -1,124 +1,275 @@
-import type { CSSProperties } from "react";
+import { useMemo, useState } from "react";
 
-import { colors } from "@/theme";
+import AgendaView from "@/components/AgendaView";
+import EventList from "@/components/EventList";
+import MonthGrid from "@/components/MonthGrid";
+import {
+  addMonths,
+  countEventsInMonth,
+  eventsForDate,
+  getMonthAgenda,
+  getMonthDays,
+  localDateKey,
+  startOfMonth,
+  type CalendarDay,
+} from "@/domain/calendar";
+import type { CalendarView } from "@/domain/events";
+import { useSchedule } from "@/context/useSchedule";
 
-type MarkerStyle = CSSProperties & {
-  "--marker-color"?: string;
-};
-
-const FOUNDATION_ITEMS = [
-  { label: "Tasks + subtasks", color: colors.success },
-  { label: "List + calendar views", color: colors.accent },
-  { label: "Single + repeating events", color: "#FF9500" },
-];
-
-const todayLabel = new Intl.DateTimeFormat("en-US", {
+const monthFormatter = new Intl.DateTimeFormat("en-US", {
+  month: "long",
+  year: "numeric",
+});
+const selectedDateFormatter = new Intl.DateTimeFormat("en-US", {
   day: "numeric",
   month: "long",
   weekday: "long",
-}).format(new Date());
-
-function markerStyle(color: string): MarkerStyle {
-  return { "--marker-color": color };
-}
+});
+const fullDateFormatter = new Intl.DateTimeFormat("en-US", {
+  day: "numeric",
+  month: "long",
+  weekday: "long",
+  year: "numeric",
+});
 
 export default function App() {
+  const {
+    events,
+    status,
+    source,
+    errorMessage,
+    lastUpdatedAt,
+    retry,
+  } = useSchedule();
+  const [today] = useState(() => new Date());
+  const [anchorDate, setAnchorDate] = useState(() => startOfMonth(today));
+  const [selectedDate, setSelectedDate] = useState(
+    () => new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12),
+  );
+  const [view, setView] = useState<CalendarView>("month");
+
+  const monthDays = useMemo(
+    () => getMonthDays(anchorDate, today),
+    [anchorDate, today],
+  );
+  const selectedEvents = useMemo(
+    () => eventsForDate(events, selectedDate),
+    [events, selectedDate],
+  );
+  const agenda = useMemo(
+    () => getMonthAgenda(anchorDate, events, today),
+    [anchorDate, events, today],
+  );
+  const scheduledEntryCount = useMemo(
+    () => countEventsInMonth(anchorDate, events),
+    [anchorDate, events],
+  );
+
+  const moveMonth = (amount: number) => {
+    const nextMonth = addMonths(anchorDate, amount);
+    setAnchorDate(nextMonth);
+    setSelectedDate(nextMonth);
+  };
+
+  const goToToday = () => {
+    const now = new Date();
+    setAnchorDate(startOfMonth(now));
+    setSelectedDate(
+      new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12),
+    );
+  };
+
+  const selectDay = (day: CalendarDay) => {
+    setSelectedDate(day.date);
+    if (!day.isCurrentMonth) {
+      setAnchorDate(startOfMonth(day.date));
+    }
+  };
+
   return (
     <div className="app-shell">
       <header className="site-header">
-        <a className="brand" href="#today" aria-label="Simply Schedule home">
+        <button
+          className="brand"
+          onClick={goToToday}
+          type="button"
+          aria-label="Simply Schedule home"
+        >
           <span className="brand-mark" aria-hidden="true">
             SS
           </span>
           <span className="brand-name">Simply Schedule</span>
-        </a>
+        </button>
 
         <nav className="primary-nav" aria-label="Primary navigation">
-          <a className="nav-link nav-link-active" href="#today">
+          <button
+            className="nav-link nav-link-active"
+            onClick={() => setView("month")}
+            type="button"
+          >
+            Calendar
+          </button>
+          <button className="nav-link" onClick={goToToday} type="button">
             Today
-          </a>
-          <a className="nav-link" href="#foundation">
-            Foundation
-          </a>
+          </button>
         </nav>
 
-        <button className="outline-button header-button" type="button">
-          Settings
-        </button>
+        <div
+          className={`source-badge source-badge-${source} source-badge-${status}`}
+          aria-live="polite"
+        >
+          <span aria-hidden="true" />
+          {status === "loading"
+            ? "SYNCING"
+            : status === "error"
+              ? "SYNC ERROR"
+              : source === "firebase"
+                ? "FIREBASE LIVE"
+                : "LOCAL PREVIEW"}
+        </div>
       </header>
 
       <main className="page-content">
-        <section className="page-intro" id="today" aria-labelledby="page-title">
+        <section className="page-intro" aria-labelledby="page-title">
           <div>
-            <p className="eyebrow">{todayLabel}</p>
-            <h1 id="page-title">Make time for what matters.</h1>
+            <p className="eyebrow">Your schedule</p>
+            <h1 id="page-title">{monthFormatter.format(anchorDate)}</h1>
             <p className="intro-copy">
-              A clear place for tasks, subtasks, and events.
+              {scheduledEntryCount} scheduled {scheduledEntryCount === 1 ? "entry" : "entries"}
             </p>
           </div>
-          <button className="primary-button" type="button">
-            + Add task
+          <button className="primary-button" onClick={goToToday} type="button">
+            Today
           </button>
         </section>
 
-        <div className="dashboard-grid">
-          <section className="panel schedule-panel" aria-labelledby="schedule-title">
-            <div className="panel-heading">
+        {source === "preview" ? (
+          <div className="notice notice-preview" role="status">
+            <strong>LOCAL PREVIEW</strong>
+            <span>
+              Add the Vite Firebase environment values to view the shared schedule.
+            </span>
+          </div>
+        ) : null}
+
+        {status === "error" ? (
+          <div className="notice notice-error" role="alert">
+            <span>{errorMessage}</span>
+            <button onClick={retry} type="button">
+              Retry
+            </button>
+          </div>
+        ) : null}
+
+        <section className="calendar-surface" aria-label="Schedule calendar">
+          <div className="calendar-toolbar">
+            <div className="month-navigation" aria-label="Month navigation">
+              <button
+                aria-label="Previous month"
+                className="icon-button"
+                onClick={() => moveMonth(-1)}
+                type="button"
+              >
+                <span aria-hidden="true">←</span>
+              </button>
               <div>
-                <p className="eyebrow">Today</p>
-                <h2 id="schedule-title">Your schedule</h2>
+                <p className="eyebrow">Viewing</p>
+                <h2>{monthFormatter.format(anchorDate)}</h2>
               </div>
-              <span className="status-label">Preview</span>
+              <button
+                aria-label="Next month"
+                className="icon-button"
+                onClick={() => moveMonth(1)}
+                type="button"
+              >
+                <span aria-hidden="true">→</span>
+              </button>
             </div>
 
-            <div className="empty-state">
-              <span
-                className="empty-marker"
-                style={markerStyle(colors.success)}
-                aria-hidden="true"
+            <div className="view-switcher" aria-label="Calendar view">
+              <button
+                aria-pressed={view === "month"}
+                className={view === "month" ? "view-active" : ""}
+                onClick={() => setView("month")}
+                type="button"
+              >
+                Month
+              </button>
+              <button
+                aria-pressed={view === "agenda"}
+                className={view === "agenda" ? "view-active" : ""}
+                onClick={() => setView("agenda")}
+                type="button"
+              >
+                Agenda
+              </button>
+            </div>
+          </div>
+
+          {status === "loading" ? (
+            <div className="loading-rule" role="status">
+              <span />
+              Loading schedule…
+            </div>
+          ) : null}
+
+          {view === "month" ? (
+            <div className="month-layout">
+              <MonthGrid
+                days={monthDays}
+                events={events}
+                onSelectDay={selectDay}
+                selectedKey={localDateKey(selectedDate)}
               />
-              <h3>Nothing scheduled yet.</h3>
-              <p>
-                Tasks and events will appear here once the schedule is connected.
-              </p>
+              <aside className="selected-day" aria-labelledby="selected-day-title">
+                <div className="selected-day-heading">
+                  <p className="eyebrow">
+                    {localDateKey(selectedDate) === localDateKey(today)
+                      ? "Today"
+                      : "Selected day"}
+                  </p>
+                  <h2 id="selected-day-title">
+                    {selectedDateFormatter.format(selectedDate)}
+                  </h2>
+                  <span>
+                    {selectedEvents.length} {selectedEvents.length === 1 ? "event" : "events"}
+                  </span>
+                </div>
+                <EventList
+                  emptyMessage="NO EVENTS SCHEDULED."
+                  events={selectedEvents}
+                  showNotes
+                />
+              </aside>
             </div>
-          </section>
+          ) : (
+            <AgendaView agenda={agenda} />
+          )}
+        </section>
 
-          <aside className="panel foundation-panel" id="foundation" aria-labelledby="foundation-title">
-            <div className="panel-heading compact-heading">
-              <div>
-                <p className="eyebrow">Coming next</p>
-                <h2 id="foundation-title">Foundation</h2>
-              </div>
-            </div>
-
-            <ul className="foundation-list">
-              {FOUNDATION_ITEMS.map((item) => (
-                <li className="foundation-item" key={item.label}>
-                  <span
-                    className="foundation-marker"
-                    style={markerStyle(item.color)}
-                    aria-hidden="true"
-                  />
-                  <span>{item.label}</span>
-                </li>
-              ))}
-            </ul>
-
-            <div className="foundation-note">
-              <p className="eyebrow">Web foundation</p>
-              <p>
-                This shell establishes the visual and structural starting point for
-                the product.
-              </p>
-            </div>
-          </aside>
+        <div className="data-note">
+          <div>
+            <p className="eyebrow">Calendar data</p>
+            <p>
+              {source === "firebase"
+                ? "READING USER-SCOPED SINGLE EVENTS FROM FIRESTORE."
+                : "SHOWING LOCAL VIEW-ONLY SAMPLE EVENTS."}
+            </p>
+          </div>
+          <span>
+            {lastUpdatedAt
+              ? `UPDATED ${lastUpdatedAt.toLocaleTimeString([], {
+                  hour: "numeric",
+                  minute: "2-digit",
+                })}`
+              : fullDateFormatter.format(today)}
+          </span>
         </div>
       </main>
 
       <footer className="site-footer">
         <span>Simply Schedule</span>
-        <span>Web foundation · 0.1.0</span>
+        <span>Calendar viewing pass · 0.2.0</span>
       </footer>
     </div>
   );

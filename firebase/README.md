@@ -34,7 +34,7 @@ No service-account credentials or production secrets belong in this repository. 
 - [`../mobile/.env.example`](../mobile/.env.example) for Expo (`EXPO_PUBLIC_FIREBASE_*`).
 - [`../web/.env.example`](../web/.env.example) for Vite (`VITE_FIREBASE_*`).
 
-The client SDKs and auth/data repositories are intentionally not wired in by this foundation scaffold.
+The React web client is wired to this boundary for calendar viewing; the mobile client and all mutation workflows remain outside this pass.
 
 ## Initial Firestore shape
 
@@ -65,25 +65,9 @@ Subtasks stay in the same collection so list and calendar queries share one repo
 
 ### Single and repeating events
 
-An event has `title`, `notes`, `kind`, `startsAt`, `endsAt`, `allDay`, `timeZone`, `recurrence`, `createdAt`, and `updatedAt`. `endsAt` and `recurrence` are `null` for an event that does not use them. `timeZone` stores the IANA zone used when the event was created or edited.
+The canonical cross-platform event schema, timestamp/all-day semantics, versioned recurrence grammar, required pattern encodings, and current web query are defined in [`CALENDAR_EVENT_CONTRACT.md`](./CALENDAR_EVENT_CONTRACT.md). That contract is shared by the React web and React Native iOS clients.
 
-`kind` is either `single` or `repeating`. A repeating event stores:
-
-```ts
-{
-  frequency: "daily" | "weekly" | "monthly" | "yearly",
-  interval: number,
-  daysOfWeek: number[] | null,
-  dayOfMonth: number | null,
-  termination: {
-    type: "never" | "onDate" | "afterOccurrences",
-    until: Timestamp | null,
-    count: number | null
-  }
-}
-```
-
-`daysOfWeek` and `dayOfMonth` are intentionally explicit nullable fields. Weekly recurrences require `daysOfWeek`; monthly recurrences require `dayOfMonth`. The termination object supports an open-ended series, a final timestamp, or a maximum occurrence count. The backend stores the rule rather than materializing occurrences; a later calendar repository should expand a bounded window for display and avoid writing duplicate occurrences.
+An event has `title`, `notes`, `kind`, `startsAt`, `endsAt`, `allDay`, `timeZone`, `recurrence`, `createdAt`, and `updatedAt`. `kind` is `single` or `repeating`; single events use `recurrence: null`. Version 1 recurrence supports hourly, daily, weekly, monthly, and yearly intervals plus numeric-day and ordinal-weekday selectors. It can represent first-of-month, third-Friday, every-other-day, every-three-days, and every-five-hours without materialized occurrence documents.
 
 Calendar, list, and agenda views are projections over these documents and should not become separate sources of truth. The indexes cover sibling ordering, task status/due-date filtering, and event kind/start-date filtering; add an index only when a concrete query requires one.
 
@@ -97,6 +81,8 @@ Included:
 
 Not included yet:
 
-- Firebase client SDK initialization in either app.
-- Sign-in screens, repositories, CRUD actions, or offline synchronization.
+- Mobile Firebase client initialization or event workflows.
+- Event creation/edit/delete UI, account screens, or offline synchronization.
 - Recurrence expansion, task hierarchy mutation logic, reminders, or Cloud Functions.
+
+The React web client now initializes Firebase when its Vite environment is complete, authenticates an anonymous view-phase user, and subscribes to user-scoped single events through a repository boundary. See [`../web/README.md`](../web/README.md) for live and emulator run instructions.

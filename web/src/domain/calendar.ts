@@ -1,0 +1,202 @@
+import type { CalendarEvent, SingleEvent } from "@/domain/events";
+
+export const WEEK_STARTS_ON = 0;
+export const DAYS_IN_MONTH_GRID = 42;
+
+export type CalendarDay = {
+  date: Date;
+  key: string;
+  dayNumber: number;
+  isCurrentMonth: boolean;
+  isToday: boolean;
+};
+
+export type AgendaDay = {
+  day: CalendarDay;
+  events: SingleEvent[];
+};
+
+const dateFormatters = new Map<string, Intl.DateTimeFormat>();
+
+function pad(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+function addDateKeyDays(dateKey: string, amount: number) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + amount));
+
+  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(
+    date.getUTCDate(),
+  )}`;
+}
+
+export function localDateKey(date: Date) {
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+    date.getDate(),
+  )}`;
+}
+
+export function dateKeyInTimeZone(date: Date, timeZone: string) {
+  let formatter = dateFormatters.get(timeZone);
+
+  if (!formatter) {
+    try {
+      formatter = new Intl.DateTimeFormat("en-US", {
+        day: "2-digit",
+        month: "2-digit",
+        timeZone,
+        year: "numeric",
+      });
+      dateFormatters.set(timeZone, formatter);
+    } catch {
+      return localDateKey(date);
+    }
+  }
+
+  const parts = formatter.formatToParts(date);
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+
+  return year && month && day
+    ? `${year}-${month}-${day}`
+    : localDateKey(date);
+}
+
+export function startOfMonth(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1, 12);
+}
+
+export function addMonths(date: Date, amount: number) {
+  return new Date(date.getFullYear(), date.getMonth() + amount, 1, 12);
+}
+
+export function getMonthDays(
+  anchorDate: Date,
+  today = new Date(),
+  weekStartsOn = WEEK_STARTS_ON,
+): CalendarDay[] {
+  const monthStart = startOfMonth(anchorDate);
+  const leadingDays = (monthStart.getDay() - weekStartsOn + 7) % 7;
+  const gridStart = new Date(
+    monthStart.getFullYear(),
+    monthStart.getMonth(),
+    1 - leadingDays,
+    12,
+  );
+  const todayKey = localDateKey(today);
+
+  return Array.from({ length: DAYS_IN_MONTH_GRID }, (_, index) => {
+    const date = new Date(
+      gridStart.getFullYear(),
+      gridStart.getMonth(),
+      gridStart.getDate() + index,
+      12,
+    );
+    const key = localDateKey(date);
+
+    return {
+      date,
+      key,
+      dayNumber: date.getDate(),
+      isCurrentMonth:
+        date.getFullYear() === monthStart.getFullYear() &&
+        date.getMonth() === monthStart.getMonth(),
+      isToday: key === todayKey,
+    };
+  });
+}
+
+export function eventOccursOnDate(event: CalendarEvent, date: Date) {
+  // Repeating series are intentionally expanded in the recurrence phase. Showing
+  // only their seed as though it were the full series would be misleading.
+  if (event.kind === "repeating") {
+    return false;
+  }
+
+  if (event.allDay) {
+    const selectedKey = localDateKey(date);
+    const startKey = dateKeyInTimeZone(event.startsAt, event.timeZone);
+    const providedEndKey = event.endsAt
+      ? dateKeyInTimeZone(event.endsAt, event.timeZone)
+      : null;
+    const endKey =
+      providedEndKey && providedEndKey > startKey
+        ? providedEndKey
+        : addDateKeyDays(startKey, 1);
+
+    return selectedKey >= startKey && selectedKey < endKey;
+  }
+
+  const dayStart = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+  );
+  const dayEnd = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate() + 1,
+  );
+
+  if (!event.endsAt) {
+    return event.startsAt >= dayStart && event.startsAt < dayEnd;
+  }
+
+  return event.startsAt < dayEnd && event.endsAt > dayStart;
+}
+
+export function sortEvents(events: SingleEvent[]) {
+  return [...events].sort((left, right) => {
+    if (left.allDay !== right.allDay) {
+      return left.allDay ? -1 : 1;
+    }
+
+    const startDifference = left.startsAt.getTime() - right.startsAt.getTime();
+    return startDifference || left.title.localeCompare(right.title);
+  });
+}
+
+export function eventsForDate(events: CalendarEvent[], date: Date) {
+  return sortEvents(
+    events.filter(
+      (event): event is SingleEvent =>
+        event.kind === "single" && eventOccursOnDate(event, date),
+    ),
+  );
+}
+
+export function getMonthAgenda(
+  anchorDate: Date,
+  events: CalendarEvent[],
+  today = new Date(),
+): AgendaDay[] {
+  const year = anchorDate.getFullYear();
+  const month = anchorDate.getMonth();
+  const dayCount = new Date(year, month + 1, 0).getDate();
+  const todayKey = localDateKey(today);
+
+  return Array.from({ length: dayCount }, (_, index) => {
+    const date = new Date(year, month, index + 1, 12);
+    const key = localDateKey(date);
+
+    return {
+      day: {
+        date,
+        key,
+        dayNumber: date.getDate(),
+        isCurrentMonth: true,
+        isToday: key === todayKey,
+      },
+      events: eventsForDate(events, date),
+    };
+  }).filter((agendaDay) => agendaDay.events.length > 0);
+}
+
+export function countEventsInMonth(anchorDate: Date, events: CalendarEvent[]) {
+  return getMonthAgenda(anchorDate, events).reduce(
+    (count, day) => count + day.events.length,
+    0,
+  );
+}

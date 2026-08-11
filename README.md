@@ -24,7 +24,7 @@ npm install
 npm run dev
 ```
 
-The web entry point is a responsive schedule shell only; it does not yet implement product workflows or persistence.
+The web client now provides responsive month and agenda calendar viewing with Firebase-backed, user-scoped single-event snapshots and an explicit local preview mode. Event creation and recurrence expansion remain for the next web phase.
 
 ## Firebase foundation
 
