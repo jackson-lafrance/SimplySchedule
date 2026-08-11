@@ -5,7 +5,7 @@
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
-    "ios": "expo start --ios",
+    "ios": "expo start --go --ios",
     "android": "expo start --android",
     "test": "TZ=America/Los_Angeles tsx --test src/domain/*.test.ts src/lib/*.test.ts src/services/*.test.ts",
     "lint": "expo lint",
