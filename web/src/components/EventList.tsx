@@ -1,11 +1,11 @@
-import type { SingleEvent } from "@/domain/events";
+import type { EventOccurrence } from "@/domain/events";
 
 const timeFormatter = new Intl.DateTimeFormat("en-US", {
   hour: "numeric",
   minute: "2-digit",
 });
 
-function eventTime(event: SingleEvent) {
+function eventTime(event: EventOccurrence) {
   if (event.allDay) {
     return "ALL DAY";
   }
@@ -21,7 +21,7 @@ export default function EventList({
   emptyMessage,
   showNotes = false,
 }: {
-  events: SingleEvent[];
+  events: EventOccurrence[];
   emptyMessage: string;
   showNotes?: boolean;
 }) {
@@ -49,6 +49,9 @@ export default function EventList({
                 {eventTime(event)}
               </time>
             </div>
+            {event.isRepeating ? (
+              <span className="repeat-label">↻ REPEATS</span>
+            ) : null}
             {showNotes && event.notes ? <p>{event.notes}</p> : null}
           </div>
         </li>

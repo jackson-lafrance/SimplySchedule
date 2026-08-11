@@ -5,7 +5,7 @@
 **Clients:** React web and React Native iOS
 **Canonical store:** Cloud Firestore in the Firebase project selected by `.firebaserc`
 
-This document is the cross-platform contract for calendar viewing and the later event-creation/recurrence phase. Firestore stores canonical event documents; month, agenda, day, and week displays are client projections and are never written as separate documents.
+This document is the cross-platform contract for calendar viewing and event creation/recurrence. Firestore stores canonical event documents; month, agenda, day, and week displays are client projections and are never written as separate documents. The web client implements this full contract; platform delivery status does not change the shared schema.
 
 ## Ownership and path
 
@@ -41,7 +41,7 @@ Every event has exactly these fields:
 - All-day starts/ends are interpreted in the event's IANA `timeZone`; `endsAt` is exclusive. A one-day all-day event starts at local midnight and ends at the next local midnight.
 - A timed event with `endsAt: null` is a point event.
 - A timed event intersects a day when `startsAt < dayEnd` and `endsAt > dayStart`; a point event belongs to the day containing `startsAt`.
-- The current calendar-view pass projects `kind == "single"` only on both platforms. Neither client renders a repeating series seed as if it were the complete series. Bounded recurrence expansion is part of the later recurrence phase.
+- A repeating series seed is never rendered as a standalone event. The web client expands occurrences only for its current six-week visible range; calculated occurrences are never persisted.
 
 ## Recurrence map, version 1
 
@@ -81,7 +81,9 @@ Termination semantics:
 - `onDate`: `until` is non-null and inclusive by occurrence start (`occurrence.startsAt <= until`); `count` is null.
 - `afterOccurrences`: positive integer `count`, including the seed/first occurrence; `until` is null.
 - Missing monthly days (for example day 31 in April) are skipped, not clamped.
-- Calendar arithmetic happens in `timeZone`; elapsed UTC hours must not replace local calendar arithmetic for daily/monthly/yearly rules.
+- Calendar arithmetic happens in `timeZone`; elapsed UTC hours must not replace local calendar arithmetic for daily/weekly/monthly/yearly rules. Hourly recurrence uses elapsed-hour intervals.
+- The web through-date control stores the end of the chosen local day, so every occurrence start on that date remains included.
+- Web monthly preset creation aligns `startsAt` to the next matching first-of-month or third-Friday date; the canonical series seed is therefore its actual first occurrence.
 
 ### Required later-phase pattern encodings
 
@@ -107,21 +109,28 @@ Each example also includes `version: 1` and a complete `termination` map in Fire
 
 ## Query and projection contract
 
-Each platform's view-only event repository subscribes to:
+The web repository uses the displayed six-week range `[rangeStart, rangeEnd)` and combines three user-scoped listeners:
 
 ```text
-users/{uid}/events
-  where kind == "single"
-  order by startsAt ascending
+point single events:
+  kind == "single", endsAt == null,
+  startsAt >= rangeStart, startsAt < rangeEnd
+
+duration/all-day single events:
+  kind == "single",
+  startsAt < rangeEnd, endsAt > rangeStart
+
+repeating series candidates:
+  kind == "repeating", startsAt < rangeEnd
 ```
 
-The existing `kind + startsAt` index supports this query. The client converts every Firestore timestamp at the repository boundary, validates kind/recurrence invariants, and keeps Firestore details out of calendar components.
+The committed indexes support these concrete query shapes. The repository converts Firestore timestamps at its boundary, strictly validates kind/recurrence invariants, merges snapshots by canonical ID, and keeps Firestore details out of components.
 
-This initial all-single-events subscription favors a simple correct snapshot listener. Before large-data release, replace it on both platforms with visible-range single-event queries plus a bounded repeating-series query/expander. Preserve event IDs throughout projections so later details/editors address the canonical document.
+The web domain expander clips all point/duration occurrences to the same half-open range and emits at most 2,000 occurrences per projection, with a defensive 100,000-iteration ceiling. A repeating occurrence key is `<eventId>@<start-instant-ISO>` so hourly occurrences remain unique through repeated daylight-saving wall times. The occurrence retains its canonical `eventId`; it is not an independently persisted event.
 
 ## View-phase seed behavior
 
-- Missing/incomplete platform Firebase configuration selects an explicit `LOCAL PREVIEW` with the same in-memory single-event fixtures. Preview events are never uploaded.
+- Missing/incomplete platform Firebase configuration selects an explicit `LOCAL PREVIEW` with the same in-memory single-event fixtures. Web-created preview events last for the browser session and are never uploaded.
 - Web uses `VITE_FIREBASE_*`; iOS uses `EXPO_PUBLIC_FIREBASE_*`. Both target the Firebase project selected by `.firebaserc` and the emulator ports in `firebase.json`.
 - When each platform's `*_FIREBASE_USE_EMULATORS=true` and `*_FIREBASE_SEED_EMULATOR=true`, an empty anonymous user's event collection receives the same minimal preview events. This is development-only proof data.
-- Production Firebase data is read-only in this pass on both clients. There is no event-creation, edit, delete, or recurrence UI yet.
+- The web client creates canonical single and repeating documents with generated document IDs and server values for both lifecycle timestamps. Its strict encoder writes exactly the documented fields. Edit/delete and occurrence exceptions remain outside this phase.

@@ -2,7 +2,7 @@ import {
   eventsForDate,
   type CalendarDay,
 } from "@/domain/calendar";
-import type { CalendarEvent } from "@/domain/events";
+import type { EventOccurrence } from "@/domain/events";
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const accessibleDateFormatter = new Intl.DateTimeFormat("en-US", {
@@ -19,7 +19,7 @@ export default function MonthGrid({
   onSelectDay,
 }: {
   days: CalendarDay[];
-  events: CalendarEvent[];
+  events: EventOccurrence[];
   selectedKey: string;
   onSelectDay: (day: CalendarDay) => void;
 }) {

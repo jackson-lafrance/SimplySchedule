@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -10,14 +11,14 @@ import {
   ScheduleContext,
   type ScheduleState,
 } from "@/context/scheduleContextValue";
+import { visibleRangeForMonth } from "@/domain/calendar";
 import { createDemoEvents } from "@/domain/demoEvents";
+import type { CreateEventInput, VisibleRange } from "@/domain/events";
+import { getFirebaseClient, getOrCreateScheduleUser } from "@/lib/firebase";
 import {
-  getFirebaseClient,
-  getOrCreateScheduleUser,
-} from "@/lib/firebase";
-import {
+  createEvent as persistEvent,
   seedEmulatorEvents,
-  subscribeToSingleEvents,
+  subscribeToEventsInRange,
 } from "@/services/eventRepository";
 
 const configuredClient = getFirebaseClient();
@@ -43,9 +44,21 @@ function readableScheduleError(error: unknown) {
   return "THE SCHEDULE COULD NOT SYNC. CHECK FIREBASE AND TRY AGAIN.";
 }
 
+function sameRange(left: VisibleRange, right: VisibleRange) {
+  return (
+    left.start.getTime() === right.start.getTime() &&
+    left.end.getTime() === right.end.getTime()
+  );
+}
+
 export function ScheduleProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<ScheduleState>(initialState);
+  const [visibleRange, setVisibleRangeState] = useState(() =>
+    visibleRangeForMonth(new Date()),
+  );
   const [loadAttempt, setLoadAttempt] = useState(0);
+  const userIdRef = useRef<string | null>(null);
+  const seededEmulatorRef = useRef(false);
 
   useEffect(() => {
     if (!configuredClient) {
@@ -54,7 +67,6 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
 
     let active = true;
     let unsubscribe: (() => void) | undefined;
-    let seedStarted = false;
 
     const fail = (error: unknown) => {
       if (!active) {
@@ -73,17 +85,19 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
         if (!active) {
           return;
         }
+        userIdRef.current = user.uid;
 
-        unsubscribe = subscribeToSingleEvents(
+        unsubscribe = subscribeToEventsInRange(
           configuredClient.db,
           user.uid,
+          visibleRange,
           (events) => {
             if (
               configuredClient.seedEmulator &&
               events.length === 0 &&
-              !seedStarted
+              !seededEmulatorRef.current
             ) {
-              seedStarted = true;
+              seededEmulatorRef.current = true;
               void seedEmulatorEvents(
                 configuredClient.db,
                 user.uid,
@@ -113,7 +127,33 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
       active = false;
       unsubscribe?.();
     };
-  }, [loadAttempt]);
+  }, [loadAttempt, visibleRange]);
+
+  const setVisibleRange = useCallback((range: VisibleRange) => {
+    setVisibleRangeState((current) => (sameRange(current, range) ? current : range));
+  }, []);
+
+  const createEvent = useCallback(async (input: CreateEventInput) => {
+    if (!configuredClient) {
+      const now = new Date();
+      const id = globalThis.crypto?.randomUUID?.() ?? `preview-${now.getTime()}`;
+      setState((current) => ({
+        ...current,
+        events: [
+          ...current.events,
+          { ...input, id, createdAt: now, updatedAt: now },
+        ],
+        lastUpdatedAt: now,
+      }));
+      return id;
+    }
+
+    const userId = userIdRef.current;
+    if (!userId) {
+      throw new Error("THE SCHEDULE IS STILL CONNECTING. TRY AGAIN.");
+    }
+    return persistEvent(configuredClient.db, userId, input);
+  }, []);
 
   const retry = useCallback(() => {
     if (!configuredClient) {
@@ -129,8 +169,14 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ ...state, retry }),
-    [retry, state],
+    () => ({
+      ...state,
+      visibleRange,
+      setVisibleRange,
+      createEvent,
+      retry,
+    }),
+    [createEvent, retry, setVisibleRange, state, visibleRange],
   );
 
   return (

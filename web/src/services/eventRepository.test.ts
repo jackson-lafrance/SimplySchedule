@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { decodeEventDocument } from "@/services/eventRepository";
+import type { CreateEventInput } from "@/domain/events";
+import {
+  decodeEventDocument,
+  encodeCreateEventDocument,
+} from "@/services/eventRepository";
 
 function timestamp(value: string) {
   return { toDate: () => new Date(value) };
@@ -46,6 +50,58 @@ function repeatingDocument(rule: Record<string, unknown>) {
     recurrence: rule,
   });
 }
+
+describe("Firestore event creation encoding", () => {
+  it("writes exactly the canonical schema with Firestore timestamps", () => {
+    const lifecycleTimestamp = { serverTimestamp: true };
+    const input: CreateEventInput = {
+      title: "  Third Friday review  ",
+      notes: "Monthly release review.",
+      kind: "repeating",
+      startsAt: new Date("2026-08-21T16:00:00.000Z"),
+      endsAt: new Date("2026-08-21T17:00:00.000Z"),
+      allDay: false,
+      timeZone: "America/Los_Angeles",
+      recurrence: {
+        version: 1,
+        frequency: "monthly",
+        interval: 1,
+        daysOfWeek: [5],
+        dayOfMonth: null,
+        weekOfMonth: 3,
+        monthOfYear: null,
+        termination: {
+          type: "onDate",
+          until: new Date("2026-12-31T23:59:59.999Z"),
+          count: null,
+        },
+      },
+    };
+
+    const document = encodeCreateEventDocument(input, lifecycleTimestamp);
+
+    expect(Object.keys(document).sort()).toEqual([
+      "allDay",
+      "createdAt",
+      "endsAt",
+      "kind",
+      "notes",
+      "recurrence",
+      "startsAt",
+      "timeZone",
+      "title",
+      "updatedAt",
+    ]);
+    expect(document.title).toBe("Third Friday review");
+    expect(document.startsAt.toDate()).toEqual(input.startsAt);
+    expect(document.endsAt?.toDate()).toEqual(input.endsAt);
+    expect(document.recurrence?.termination.until?.toDate()).toEqual(
+      input.recurrence!.termination.until,
+    );
+    expect(document.createdAt).toBe(lifecycleTimestamp);
+    expect(document.updatedAt).toBe(lifecycleTimestamp);
+  });
+});
 
 describe("Firestore event decoding", () => {
   it("converts a valid single event timestamp contract to domain dates", () => {

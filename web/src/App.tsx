@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import AgendaView from "@/components/AgendaView";
+import CreateEventScreen from "@/components/CreateEventScreen";
 import EventList from "@/components/EventList";
 import MonthGrid from "@/components/MonthGrid";
 import {
@@ -11,9 +12,11 @@ import {
   getMonthDays,
   localDateKey,
   startOfMonth,
+  visibleRangeForMonth,
   type CalendarDay,
 } from "@/domain/calendar";
-import type { CalendarView } from "@/domain/events";
+import type { CalendarView, CreateEventInput } from "@/domain/events";
+import { expandEventsInRange } from "@/domain/recurrence";
 import { useSchedule } from "@/context/useSchedule";
 
 const monthFormatter = new Intl.DateTimeFormat("en-US", {
@@ -39,6 +42,8 @@ export default function App() {
     source,
     errorMessage,
     lastUpdatedAt,
+    createEvent,
+    setVisibleRange,
     retry,
   } = useSchedule();
   const [today] = useState(() => new Date());
@@ -47,22 +52,34 @@ export default function App() {
     () => new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12),
   );
   const [view, setView] = useState<CalendarView>("month");
+  const [creatingEvent, setCreatingEvent] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
+  const visibleRange = useMemo(
+    () => visibleRangeForMonth(anchorDate),
+    [anchorDate],
+  );
+  useEffect(() => setVisibleRange(visibleRange), [setVisibleRange, visibleRange]);
+
+  const occurrences = useMemo(
+    () => expandEventsInRange(events, visibleRange),
+    [events, visibleRange],
+  );
   const monthDays = useMemo(
     () => getMonthDays(anchorDate, today),
     [anchorDate, today],
   );
   const selectedEvents = useMemo(
-    () => eventsForDate(events, selectedDate),
-    [events, selectedDate],
+    () => eventsForDate(occurrences, selectedDate),
+    [occurrences, selectedDate],
   );
   const agenda = useMemo(
-    () => getMonthAgenda(anchorDate, events, today),
-    [anchorDate, events, today],
+    () => getMonthAgenda(anchorDate, occurrences, today),
+    [anchorDate, occurrences, today],
   );
   const scheduledEntryCount = useMemo(
-    () => countEventsInMonth(anchorDate, events),
-    [anchorDate, events],
+    () => countEventsInMonth(anchorDate, occurrences),
+    [anchorDate, occurrences],
   );
 
   const moveMonth = (amount: number) => {
@@ -84,6 +101,20 @@ export default function App() {
     if (!day.isCurrentMonth) {
       setAnchorDate(startOfMonth(day.date));
     }
+  };
+
+  const saveEvent = async (input: CreateEventInput) => {
+    await createEvent(input);
+    const eventDate = new Date(
+      input.startsAt.getFullYear(),
+      input.startsAt.getMonth(),
+      input.startsAt.getDate(),
+      12,
+    );
+    setAnchorDate(startOfMonth(eventDate));
+    setSelectedDate(eventDate);
+    setSaveMessage(input.kind === "repeating" ? "REPEATING EVENT SAVED." : "EVENT SAVED.");
+    setCreatingEvent(false);
   };
 
   return (
@@ -132,23 +163,54 @@ export default function App() {
       <main className="page-content">
         <section className="page-intro" aria-labelledby="page-title">
           <div>
-            <p className="eyebrow">Your schedule</p>
-            <h1 id="page-title">{monthFormatter.format(anchorDate)}</h1>
+            <p className="eyebrow">{creatingEvent ? "Build your schedule" : "Your schedule"}</p>
+            <h1 id="page-title">
+              {creatingEvent ? "Create event" : monthFormatter.format(anchorDate)}
+            </h1>
             <p className="intro-copy">
-              {scheduledEntryCount} scheduled {scheduledEntryCount === 1 ? "entry" : "entries"}
+              {creatingEvent
+                ? "ONE CLEAR FORM. REPEAT ONLY WHEN YOU NEED IT."
+                : `${scheduledEntryCount} scheduled ${scheduledEntryCount === 1 ? "entry" : "entries"}`}
             </p>
           </div>
-          <button className="primary-button" onClick={goToToday} type="button">
-            Today
-          </button>
+          <div className="intro-actions">
+            {creatingEvent ? (
+              <button className="outline-button" onClick={() => setCreatingEvent(false)} type="button">
+                Back to calendar
+              </button>
+            ) : (
+              <>
+                <button className="outline-button" onClick={goToToday} type="button">
+                  Today
+                </button>
+                <button
+                  className="primary-button"
+                  onClick={() => {
+                    setSaveMessage(null);
+                    setCreatingEvent(true);
+                  }}
+                  type="button"
+                >
+                  Add event
+                </button>
+              </>
+            )}
+          </div>
         </section>
 
         {source === "preview" ? (
           <div className="notice notice-preview" role="status">
             <strong>LOCAL PREVIEW</strong>
             <span>
-              Add the Vite Firebase environment values to view the shared schedule.
+              Events created here stay in this browser session. Add Firebase values for shared persistence.
             </span>
+          </div>
+        ) : null}
+
+        {saveMessage ? (
+          <div className="notice notice-success" role="status">
+            <strong>{saveMessage}</strong>
+            <span>THE CALENDAR NOW SHOWS ITS VISIBLE OCCURRENCES.</span>
           </div>
         ) : null}
 
@@ -161,6 +223,13 @@ export default function App() {
           </div>
         ) : null}
 
+        {creatingEvent ? (
+          <CreateEventScreen
+            initialDate={localDateKey(selectedDate)}
+            onCancel={() => setCreatingEvent(false)}
+            onSave={saveEvent}
+          />
+        ) : (
         <section className="calendar-surface" aria-label="Schedule calendar">
           <div className="calendar-toolbar">
             <div className="month-navigation" aria-label="Month navigation">
@@ -217,7 +286,7 @@ export default function App() {
             <div className="month-layout">
               <MonthGrid
                 days={monthDays}
-                events={events}
+                events={occurrences}
                 onSelectDay={selectDay}
                 selectedKey={localDateKey(selectedDate)}
               />
@@ -246,14 +315,15 @@ export default function App() {
             <AgendaView agenda={agenda} />
           )}
         </section>
+        )}
 
         <div className="data-note">
           <div>
             <p className="eyebrow">Calendar data</p>
             <p>
               {source === "firebase"
-                ? "READING USER-SCOPED SINGLE EVENTS FROM FIRESTORE."
-                : "SHOWING LOCAL VIEW-ONLY SAMPLE EVENTS."}
+                ? "READING AND WRITING USER-SCOPED EVENTS IN THE VISIBLE RANGE."
+                : "SHOWING SESSION-ONLY SAMPLE AND CREATED EVENTS."}
             </p>
           </div>
           <span>
@@ -269,7 +339,7 @@ export default function App() {
 
       <footer className="site-footer">
         <span>Simply Schedule</span>
-        <span>Calendar viewing pass · 0.2.0</span>
+        <span>Calendar + event workflows · 0.3.0</span>
       </footer>
     </div>
   );
