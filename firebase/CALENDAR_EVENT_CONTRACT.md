@@ -15,7 +15,7 @@ users/{uid}/events/{eventId}
 
 `uid` must equal the authenticated Firebase user's UID. The document ID is the stable event/series ID. Clients must not add an `id` field to the document.
 
-The web calendar uses Firebase Anonymous Auth when Firebase configuration is present. Anonymous auth is a view-phase identity mechanism, not a sharing model; production account/linking behavior can replace it without changing event paths.
+Both calendar clients use Firebase Anonymous Auth when their platform Firebase configuration is present. Anonymous auth is a view-phase identity mechanism, not a cross-device sharing model; production account/linking behavior can replace it without changing event paths.
 
 ## Event document
 
@@ -41,7 +41,7 @@ Every event has exactly these fields:
 - All-day starts/ends are interpreted in the event's IANA `timeZone`; `endsAt` is exclusive. A one-day all-day event starts at local midnight and ends at the next local midnight.
 - A timed event with `endsAt: null` is a point event.
 - A timed event intersects a day when `startsAt < dayEnd` and `endsAt > dayStart`; a point event belongs to the day containing `startsAt`.
-- The current web pass projects `kind == "single"` only. It deliberately does not render a repeating series seed as if it were the complete series. Bounded recurrence expansion is part of the later recurrence phase.
+- The current calendar-view pass projects `kind == "single"` only on both platforms. Neither client renders a repeating series seed as if it were the complete series. Bounded recurrence expansion is part of the later recurrence phase.
 
 ## Recurrence map, version 1
 
@@ -107,7 +107,7 @@ Each example also includes `version: 1` and a complete `termination` map in Fire
 
 ## Query and projection contract
 
-The view-only web repository subscribes to:
+Each platform's view-only event repository subscribes to:
 
 ```text
 users/{uid}/events
@@ -117,10 +117,11 @@ users/{uid}/events
 
 The existing `kind + startsAt` index supports this query. The client converts every Firestore timestamp at the repository boundary, validates kind/recurrence invariants, and keeps Firestore details out of calendar components.
 
-This initial all-single-events subscription favors a simple correct snapshot listener. Before large-data release, replace it with visible-range single-event queries plus a bounded repeating-series query/expander. Preserve event IDs throughout projections so later details/editors address the canonical document.
+This initial all-single-events subscription favors a simple correct snapshot listener. Before large-data release, replace it on both platforms with visible-range single-event queries plus a bounded repeating-series query/expander. Preserve event IDs throughout projections so later details/editors address the canonical document.
 
 ## View-phase seed behavior
 
-- Missing/incomplete Vite Firebase configuration selects an explicit `LOCAL PREVIEW` with in-memory single events. Preview events are never uploaded.
-- When both `VITE_FIREBASE_USE_EMULATORS=true` and `VITE_FIREBASE_SEED_EMULATOR=true`, an empty anonymous user's event collection receives the same minimal preview events. This is development-only proof data.
-- Production Firebase data is read-only in this pass. There is no event-creation, edit, delete, or recurrence UI yet.
+- Missing/incomplete platform Firebase configuration selects an explicit `LOCAL PREVIEW` with the same in-memory single-event fixtures. Preview events are never uploaded.
+- Web uses `VITE_FIREBASE_*`; iOS uses `EXPO_PUBLIC_FIREBASE_*`. Both target the Firebase project selected by `.firebaserc` and the emulator ports in `firebase.json`.
+- When each platform's `*_FIREBASE_USE_EMULATORS=true` and `*_FIREBASE_SEED_EMULATOR=true`, an empty anonymous user's event collection receives the same minimal preview events. This is development-only proof data.
+- Production Firebase data is read-only in this pass on both clients. There is no event-creation, edit, delete, or recurrence UI yet.

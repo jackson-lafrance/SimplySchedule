@@ -1,12 +1,12 @@
 import { createContext } from "react";
 
-import type { CalendarEvent } from "@/domain/events";
+import type { SingleEvent } from "@/domain/events";
 
 export type ScheduleStatus = "loading" | "ready" | "error";
 export type ScheduleSource = "firebase" | "preview";
 
 export type ScheduleState = {
-  events: CalendarEvent[];
+  events: SingleEvent[];
   status: ScheduleStatus;
   source: ScheduleSource;
   errorMessage: string | null;
