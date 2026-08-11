@@ -4,7 +4,7 @@
 **Date:** 2026-08-09
 **Scope:** Tasks, subtasks, calendar projections, single events, repeating events, recurrence termination, and the supporting architecture
 
-> **2026-08-11 implementation note:** the React web client now implements the calendar-viewing slice with Firebase initialization, anonymous view-phase auth, a user-scoped single-event repository, and month/agenda projections. [`firebase/CALENDAR_EVENT_CONTRACT.md`](./firebase/CALENDAR_EVENT_CONTRACT.md) supersedes this proposal's draft recurrence shape where they differ. Event creation and bounded recurrence expansion remain future work.
+> **2026-08-11 implementation note:** the React web client now implements Firebase-backed month/agenda viewing, canonical event creation, visible-range event queries, and bounded recurrence expansion. [`firebase/CALENDAR_EVENT_CONTRACT.md`](./firebase/CALENDAR_EVENT_CONTRACT.md) supersedes this proposal's draft recurrence shape where they differ. Mobile delivery remains separate.
 
 This report follows the four foundation steps: documenting SimplyLift's conventions, scaffolding the iPhone app, scaffolding the web app, and scaffolding Firebase. It is intended to stand alone as the implementation brief for the next phase. It distinguishes what exists from what is recommended so that a future implementation does not mistake the Firebase draft for a finished product contract.
 

@@ -7,24 +7,24 @@ import {
   getMonthAgenda,
   getMonthDays,
   localDateKey,
+  visibleRangeForMonth,
 } from "@/domain/calendar";
-import type { CalendarEvent, SingleEvent } from "@/domain/events";
+import type { EventOccurrence } from "@/domain/events";
 
-function singleEvent(overrides: Partial<SingleEvent> = {}): SingleEvent {
-  const createdAt = new Date(2026, 7, 1, 9);
-
+function occurrence(
+  overrides: Partial<EventOccurrence> = {},
+): EventOccurrence {
   return {
     id: "event-1",
+    eventId: "event-1",
+    occurrenceKey: "event-1",
     title: "Design review",
     notes: "",
-    kind: "single",
     startsAt: new Date(2026, 7, 11, 13),
     endsAt: new Date(2026, 7, 11, 14),
     allDay: false,
     timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-    recurrence: null,
-    createdAt,
-    updatedAt: createdAt,
+    isRepeating: false,
     ...overrides,
   };
 }
@@ -49,11 +49,18 @@ describe("calendar month navigation", () => {
     expect(localDateKey(next)).toBe("2027-01-01");
     expect(localDateKey(previous)).toBe("2025-12-01");
   });
+
+  it("uses the entire six-week grid as its half-open visible range", () => {
+    const range = visibleRangeForMonth(new Date(2026, 7, 1, 12));
+
+    expect(localDateKey(range.start)).toBe("2026-07-26");
+    expect(localDateKey(new Date(range.end.getTime() - 1))).toBe("2026-09-05");
+  });
 });
 
 describe("event calendar projection", () => {
   it("shows a timed event on each local day it overlaps", () => {
-    const event = singleEvent({
+    const event = occurrence({
       startsAt: new Date(2026, 7, 11, 23, 30),
       endsAt: new Date(2026, 7, 12, 0, 30),
     });
@@ -64,7 +71,7 @@ describe("event calendar projection", () => {
   });
 
   it("treats all-day ends as exclusive date boundaries", () => {
-    const event = singleEvent({
+    const event = occurrence({
       startsAt: new Date(Date.UTC(2026, 7, 12)),
       endsAt: new Date(Date.UTC(2026, 7, 14)),
       allDay: true,
@@ -77,9 +84,9 @@ describe("event calendar projection", () => {
   });
 
   it("sorts all-day entries before timed entries and then by start", () => {
-    const timedLater = singleEvent({ id: "later", startsAt: new Date(2026, 7, 11, 15) });
-    const timedEarlier = singleEvent({ id: "earlier", startsAt: new Date(2026, 7, 11, 9) });
-    const allDay = singleEvent({
+    const timedLater = occurrence({ id: "later", startsAt: new Date(2026, 7, 11, 15) });
+    const timedEarlier = occurrence({ id: "earlier", startsAt: new Date(2026, 7, 11, 9) });
+    const allDay = occurrence({
       id: "all-day",
       allDay: true,
       startsAt: new Date(2026, 7, 11),
@@ -94,31 +101,10 @@ describe("event calendar projection", () => {
     ).toEqual(["all-day", "earlier", "later"]);
   });
 
-  it("does not misrepresent an unexpanded repeating series as one event", () => {
-    const repeating: CalendarEvent = {
-      ...singleEvent(),
-      kind: "repeating",
-      recurrence: {
-        version: 1,
-        frequency: "daily",
-        interval: 2,
-        daysOfWeek: null,
-        dayOfMonth: null,
-        weekOfMonth: null,
-        monthOfYear: null,
-        termination: { type: "never", until: null, count: null },
-      },
-    };
-
-    expect(
-      eventsForDate([repeating], new Date(2026, 7, 11, 12)),
-    ).toEqual([]);
-  });
-
   it("groups only populated days in the monthly agenda", () => {
     const agenda = getMonthAgenda(
       new Date(2026, 7, 1, 12),
-      [singleEvent()],
+      [occurrence()],
       new Date(2026, 7, 11, 12),
     );
 

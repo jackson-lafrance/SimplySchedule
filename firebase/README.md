@@ -34,7 +34,7 @@ No service-account credentials or production secrets belong in this repository. 
 - [`../mobile/.env.example`](../mobile/.env.example) for Expo (`EXPO_PUBLIC_FIREBASE_*`).
 - [`../web/.env.example`](../web/.env.example) for Vite (`VITE_FIREBASE_*`).
 
-The React web client is wired to this boundary for calendar viewing; the mobile client and all mutation workflows remain outside this pass.
+The React web client is wired to this boundary for visible-range calendar reads and canonical event creation. Mobile delivery remains separate.
 
 ## Initial Firestore shape
 
@@ -81,8 +81,8 @@ Included:
 
 Not included yet:
 
-- Mobile Firebase client initialization or event workflows.
-- Event creation/edit/delete UI, account screens, or offline synchronization.
-- Recurrence expansion, task hierarchy mutation logic, reminders, or Cloud Functions.
+- Web event editing/deletion, account screens, or an offline outbox.
+- Occurrence exceptions, task hierarchy mutation logic, reminders, or Cloud Functions.
+- Mobile implementation changes in the web delivery.
 
-The React web client now initializes Firebase when its Vite environment is complete, authenticates an anonymous view-phase user, and subscribes to user-scoped single events through a repository boundary. See [`../web/README.md`](../web/README.md) for live and emulator run instructions.
+The React web client initializes Firebase when its Vite environment is complete, authenticates an anonymous user, subscribes to user-scoped visible-range event candidates, writes exact canonical event documents with server lifecycle timestamps, and expands recurrence locally. See [`../web/README.md`](../web/README.md) for live and emulator run instructions.

@@ -24,8 +24,8 @@ npm install
 npm run dev
 ```
 
-The web client now provides responsive month and agenda calendar viewing with Firebase-backed, user-scoped single-event snapshots and an explicit local preview mode. Event creation and recurrence expansion remain for the next web phase.
+The web client now provides responsive month and agenda views, a Simply-styled event form, canonical user-scoped Firebase writes, visible-range reads, and bounded recurrence for first-of-month, third-Friday, two-day, three-day, and five-hour schedules. Local preview creation remains session-only.
 
 ## Firebase foundation
 
-The shared Firebase configuration, Firestore rules, indexes, emulator setup, and initial data model are documented in [`firebase/README.md`](./firebase/README.md). The backend scaffold is intentionally not wired into either client yet. See [`SIMPLY_SCHEDULE_IMPLEMENTATION_DESIGN.md`](./SIMPLY_SCHEDULE_IMPLEMENTATION_DESIGN.md) for the proposed task, subtask, calendar, event, recurrence, synchronization, milestone, risk, and decision plan.
+The shared Firebase configuration, Firestore rules, indexes, emulator setup, and canonical data model are documented in [`firebase/README.md`](./firebase/README.md). See [`SIMPLY_SCHEDULE_IMPLEMENTATION_DESIGN.md`](./SIMPLY_SCHEDULE_IMPLEMENTATION_DESIGN.md) for the broader task, subtask, synchronization, milestone, risk, and decision plan.
