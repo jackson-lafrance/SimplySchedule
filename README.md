@@ -12,7 +12,7 @@ npm install
 npm run ios
 ```
 
-The initial screen is a deliberately small visual shell. Tasks, subtasks, calendar views, and events will be added in subsequent work.
+The iPhone client now provides month and agenda calendar viewing with Firebase-backed, user-scoped single-event snapshots and an explicit local preview mode. Event creation and recurrence expansion remain for the next iOS phase.
 
 ## Web
 
