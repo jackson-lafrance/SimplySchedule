@@ -23,6 +23,24 @@ function eventDocument(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function recurrence(overrides: Record<string, unknown>) {
+  return {
+    version: 1,
+    frequency: "daily",
+    interval: 1,
+    daysOfWeek: null,
+    dayOfMonth: null,
+    weekOfMonth: null,
+    monthOfYear: null,
+    termination: {
+      type: "never",
+      until: null,
+      count: null,
+    },
+    ...overrides,
+  };
+}
+
 test("decodes the shared single-event document contract", () => {
   const event = decodeEventDocument("event-1", eventDocument());
 
@@ -33,31 +51,46 @@ test("decodes the shared single-event document contract", () => {
   assert.equal(event.recurrence, null);
 });
 
-test("accepts the contract's third-Friday recurrence shape", () => {
-  const event = decodeEventDocument(
-    "series-1",
-    eventDocument({
-      kind: "repeating",
-      recurrence: {
-        version: 1,
-        frequency: "monthly",
-        interval: 1,
-        daysOfWeek: [5],
-        dayOfMonth: null,
-        weekOfMonth: 3,
-        monthOfYear: null,
-        termination: {
-          type: "never",
-          until: null,
-          count: null,
-        },
-      },
-    }),
-  );
+const requiredRecurrencePatterns: [string, Record<string, unknown>][] = [
+  ["first of the month", { frequency: "monthly", dayOfMonth: 1 }],
+  [
+    "third Friday of the month",
+    { frequency: "monthly", weekOfMonth: 3, daysOfWeek: [5] },
+  ],
+  ["every other day", { frequency: "daily", interval: 2 }],
+  ["every three days", { frequency: "daily", interval: 3 }],
+  ["every five hours", { frequency: "hourly", interval: 5 }],
+];
 
-  assert.equal(event.kind, "repeating");
-  assert.equal(event.recurrence.frequency, "monthly");
-  assert.deepEqual(event.recurrence.daysOfWeek, [5]);
+requiredRecurrencePatterns.forEach(([name, overrides]) => {
+  test(`accepts the shared recurrence shape for ${name}`, () => {
+    const event = decodeEventDocument(
+      "series-1",
+      eventDocument({
+        kind: "repeating",
+        recurrence: recurrence(overrides),
+      }),
+    );
+
+    assert.equal(event.kind, "repeating");
+    assert.deepEqual(
+      {
+        frequency: event.recurrence.frequency,
+        interval: event.recurrence.interval,
+        daysOfWeek: event.recurrence.daysOfWeek,
+        dayOfMonth: event.recurrence.dayOfMonth,
+        weekOfMonth: event.recurrence.weekOfMonth,
+      },
+      {
+        frequency: "daily",
+        interval: 1,
+        daysOfWeek: null,
+        dayOfMonth: null,
+        weekOfMonth: null,
+        ...overrides,
+      },
+    );
+  });
 });
 
 test("rejects selector combinations that diverge from the shared contract", () => {
