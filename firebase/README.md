@@ -34,7 +34,7 @@ No service-account credentials or production secrets belong in this repository. 
 - [`../mobile/.env.example`](../mobile/.env.example) for Expo (`EXPO_PUBLIC_FIREBASE_*`).
 - [`../web/.env.example`](../web/.env.example) for Vite (`VITE_FIREBASE_*`).
 
-The React web client is wired to this boundary for visible-range calendar reads and canonical event creation. The React Native iOS client uses the same boundary for calendar viewing; its mutation delivery remains separate.
+The React web and React Native iOS clients are wired to this boundary for visible-range calendar reads, canonical event creation, and bounded local recurrence expansion.
 
 ## Initial Firestore shape
 
@@ -65,7 +65,7 @@ Subtasks stay in the same collection so list and calendar queries share one repo
 
 ### Single and repeating events
 
-The canonical cross-platform event schema, timestamp/all-day semantics, versioned recurrence grammar, required pattern encodings, and current web query are defined in [`CALENDAR_EVENT_CONTRACT.md`](./CALENDAR_EVENT_CONTRACT.md). That contract is shared by the React web and React Native iOS clients.
+The canonical cross-platform event schema, timestamp/all-day semantics, versioned recurrence grammar, required pattern encodings, and platform query shapes are defined in [`CALENDAR_EVENT_CONTRACT.md`](./CALENDAR_EVENT_CONTRACT.md). That contract is shared by the React web and React Native iOS clients.
 
 An event has `title`, `notes`, `kind`, `startsAt`, `endsAt`, `allDay`, `timeZone`, `recurrence`, `createdAt`, and `updatedAt`. `kind` is `single` or `repeating`; single events use `recurrence: null`. Version 1 recurrence supports hourly, daily, weekly, monthly, and yearly intervals plus numeric-day and ordinal-weekday selectors. It can represent first-of-month, third-Friday, every-other-day, every-three-days, and every-five-hours without materialized occurrence documents.
 
@@ -83,6 +83,5 @@ Not included yet:
 
 - Event editing/deletion, account screens, or an offline outbox.
 - Occurrence exceptions, task hierarchy mutation logic, reminders, or Cloud Functions.
-- Mobile event creation and recurrence expansion in the completed web delivery.
 
-The React web client initializes Firebase when its Vite environment is complete, authenticates an anonymous user, subscribes to user-scoped visible-range event candidates, writes exact canonical event documents with server lifecycle timestamps, and expands recurrence locally. The React Native iOS client currently reads the same user-scoped collection for its calendar views. See [`../web/README.md`](../web/README.md) and [`../mobile/README.md`](../mobile/README.md) for run instructions.
+Both clients initialize Firebase when their platform environment is complete, authenticate an anonymous user, subscribe to user-scoped visible-range event candidates, write exact canonical event documents with server lifecycle timestamps, and expand recurrence locally. See [`../web/README.md`](../web/README.md) and [`../mobile/README.md`](../mobile/README.md) for run instructions.

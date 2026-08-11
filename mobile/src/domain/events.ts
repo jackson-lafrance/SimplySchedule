@@ -51,4 +51,39 @@ export type RepeatingEvent = EventBase & {
 };
 
 export type CalendarEvent = SingleEvent | RepeatingEvent;
+
+/** A visible, display-only projection; repeating occurrences are never saved. */
+export type EventOccurrence = {
+  id: string;
+  eventId: string;
+  occurrenceKey: string;
+  title: string;
+  notes: string;
+  startsAt: Date;
+  endsAt: Date | null;
+  allDay: boolean;
+  timeZone: string;
+  isRepeating: boolean;
+};
+
+type CreateEventBase = {
+  title: string;
+  notes: string;
+  startsAt: Date;
+  endsAt: Date | null;
+  allDay: boolean;
+  timeZone: string;
+};
+
+export type CreateEventInput = CreateEventBase &
+  (
+    | { kind: "single"; recurrence: null }
+    | { kind: "repeating"; recurrence: RecurrenceRule }
+  );
+
+export type VisibleRange = {
+  start: Date;
+  end: Date;
+};
+
 export type CalendarView = "month" | "agenda";

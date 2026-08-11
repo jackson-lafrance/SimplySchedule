@@ -4,7 +4,7 @@ import {
   eventsForDate,
   type CalendarDay,
 } from "@/domain/calendar";
-import type { CalendarEvent } from "@/domain/events";
+import type { EventOccurrence } from "@/domain/events";
 import { colors, radii, spacing, typography } from "@/theme";
 
 const WEEKDAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
@@ -22,7 +22,7 @@ export default function MonthGrid({
   onSelectDay,
 }: {
   days: CalendarDay[];
-  events: CalendarEvent[];
+  events: EventOccurrence[];
   selectedKey: string;
   onSelectDay: (day: CalendarDay) => void;
 }) {

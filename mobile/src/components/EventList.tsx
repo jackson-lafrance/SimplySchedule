@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from "react-native";
 
-import type { SingleEvent } from "@/domain/events";
+import type { EventOccurrence } from "@/domain/events";
 import { colors, radii, spacing, typography } from "@/theme";
 
 const timeFormatter = new Intl.DateTimeFormat("en-US", {
@@ -8,7 +8,7 @@ const timeFormatter = new Intl.DateTimeFormat("en-US", {
   minute: "2-digit",
 });
 
-function eventTime(event: SingleEvent) {
+function eventTime(event: EventOccurrence) {
   if (event.allDay) {
     return "ALL DAY";
   }
@@ -24,7 +24,7 @@ export default function EventList({
   emptyMessage,
   showNotes = false,
 }: {
-  events: SingleEvent[];
+  events: EventOccurrence[];
   emptyMessage: string;
   showNotes?: boolean;
 }) {
@@ -41,7 +41,7 @@ export default function EventList({
     <View style={styles.list}>
       {events.map((event) => (
         <View
-          accessibilityLabel={`${event.title}, ${eventTime(event)}`}
+          accessibilityLabel={`${event.title}, ${eventTime(event)}${event.isRepeating ? ", repeating" : ""}`}
           key={event.id}
           style={styles.event}
         >
@@ -51,7 +51,12 @@ export default function EventList({
             style={styles.marker}
           />
           <View style={styles.eventCopy}>
-            <Text style={styles.eventTime}>{eventTime(event)}</Text>
+            <View style={styles.eventMeta}>
+              <Text style={styles.eventTime}>{eventTime(event)}</Text>
+              {event.isRepeating ? (
+                <Text style={styles.repeatLabel}>↻ REPEATS</Text>
+              ) : null}
+            </View>
             <Text style={styles.eventTitle}>{event.title}</Text>
             {showNotes && event.notes ? (
               <Text style={styles.eventNotes}>{event.notes}</Text>
@@ -85,11 +90,22 @@ const styles = StyleSheet.create({
   eventCopy: {
     flex: 1,
   },
+  eventMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.xs,
+    marginBottom: spacing.xxs,
+  },
   eventTime: {
     ...typography.label,
     color: colors.muted,
     fontFamily: "ui-monospace",
-    marginBottom: spacing.xxs,
+  },
+  repeatLabel: {
+    ...typography.label,
+    color: colors.accent,
+    fontSize: 8,
   },
   eventTitle: {
     ...typography.body,

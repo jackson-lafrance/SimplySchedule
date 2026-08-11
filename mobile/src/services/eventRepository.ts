@@ -4,6 +4,8 @@ import {
   onSnapshot,
   orderBy,
   query,
+  serverTimestamp,
+  setDoc,
   Timestamp,
   where,
   writeBatch,
@@ -14,10 +16,12 @@ import {
 
 import type {
   CalendarEvent,
+  CreateEventInput,
   RecurrenceFrequency,
   RecurrenceRule,
   RecurrenceTerminationType,
   SingleEvent,
+  VisibleRange,
 } from "@/domain/events";
 
 const FREQUENCIES: RecurrenceFrequency[] = [
@@ -129,9 +133,7 @@ function nullableWeekdays(value: unknown) {
     value.length > 7 ||
     value.some(
       (day) =>
-        !Number.isInteger(day) ||
-        (day as number) < 0 ||
-        (day as number) > 6,
+        !Number.isInteger(day) || (day as number) < 0 || (day as number) > 6,
     )
   ) {
     throw new Error("Event recurrence daysOfWeek is invalid.");
@@ -196,7 +198,9 @@ function decodeRecurrence(value: unknown): RecurrenceRule {
   ) {
     throw new Error("Event recurrence interval is invalid.");
   }
-  if (!TERMINATION_TYPES.includes(terminationType as RecurrenceTerminationType)) {
+  if (
+    !TERMINATION_TYPES.includes(terminationType as RecurrenceTerminationType)
+  ) {
     throw new Error("Event recurrence termination is invalid.");
   }
   if (value.version !== 1) {
@@ -272,7 +276,6 @@ export function decodeEventDocument(
     createdAt: dateValue(value.createdAt, "createdAt"),
     updatedAt: dateValue(value.updatedAt, "updatedAt"),
   };
-
   if (base.allDay && !base.endsAt) {
     throw new Error(`All-day event ${id} must have an exclusive end.`);
   }
@@ -291,40 +294,147 @@ export function decodeEventDocument(
 }
 
 function decodeSnapshot(document: QueryDocumentSnapshot<DocumentData>) {
-  return decodeEventDocument(document.id, document.data());
+  return decodeEventDocument(
+    document.id,
+    document.data({ serverTimestamps: "estimate" }),
+  );
 }
 
-export function subscribeToSingleEvents(
+/**
+ * Keeps canonical reads tied to the displayed range. Point and duration events
+ * are queried separately so cross-boundary events remain visible; old repeating
+ * seeds are included only when they can still expand before range end.
+ */
+export function subscribeToEventsInRange(
   db: Firestore,
   userId: string,
-  onEvents: (events: SingleEvent[]) => void,
+  range: VisibleRange,
+  onEvents: (events: CalendarEvent[]) => void,
   onError: (error: Error) => void,
 ) {
-  const eventsQuery = query(
-    collection(db, "users", userId, "events"),
-    where("kind", "==", "single"),
-    orderBy("startsAt", "asc"),
+  const events = collection(db, "users", userId, "events");
+  const subscriptions = [
+    query(
+      events,
+      where("kind", "==", "single"),
+      where("endsAt", "==", null),
+      where("startsAt", ">=", Timestamp.fromDate(range.start)),
+      where("startsAt", "<", Timestamp.fromDate(range.end)),
+      orderBy("startsAt", "asc"),
+    ),
+    query(
+      events,
+      where("kind", "==", "single"),
+      where("startsAt", "<", Timestamp.fromDate(range.end)),
+      where("endsAt", ">", Timestamp.fromDate(range.start)),
+      orderBy("startsAt", "asc"),
+      orderBy("endsAt", "asc"),
+    ),
+    query(
+      events,
+      where("kind", "==", "repeating"),
+      where("startsAt", "<", Timestamp.fromDate(range.end)),
+      orderBy("startsAt", "asc"),
+    ),
+  ];
+  const snapshots = new Map<number, CalendarEvent[]>();
+  let failed = false;
+
+  const unsubscribes = subscriptions.map((eventsQuery, index) =>
+    onSnapshot(
+      eventsQuery,
+      (snapshot) => {
+        if (failed) {
+          return;
+        }
+        try {
+          snapshots.set(index, snapshot.docs.map(decodeSnapshot));
+          if (snapshots.size === subscriptions.length) {
+            const merged = [...snapshots.values()].flat();
+            const unique = new Map(
+              merged.map((event) => [event.id, event] as const),
+            );
+            onEvents(
+              [...unique.values()].sort(
+                (left, right) =>
+                  left.startsAt.getTime() - right.startsAt.getTime(),
+              ),
+            );
+          }
+        } catch (error) {
+          failed = true;
+          onError(
+            error instanceof Error
+              ? error
+              : new Error("The schedule data could not be read."),
+          );
+        }
+      },
+      (error) => {
+        if (!failed) {
+          failed = true;
+          onError(error);
+        }
+      },
+    ),
   );
 
-  return onSnapshot(
-    eventsQuery,
-    (snapshot) => {
-      try {
-        onEvents(
-          snapshot.docs.map(decodeSnapshot).filter(
-            (event): event is SingleEvent => event.kind === "single",
-          ),
-        );
-      } catch (error) {
-        onError(
-          error instanceof Error
-            ? error
-            : new Error("The schedule data could not be read."),
-        );
-      }
+  return () => unsubscribes.forEach((unsubscribe) => unsubscribe());
+}
+
+function encodeRecurrence(recurrence: RecurrenceRule | null) {
+  if (!recurrence) {
+    return null;
+  }
+  return {
+    ...recurrence,
+    daysOfWeek: recurrence.daysOfWeek ? [...recurrence.daysOfWeek] : null,
+    termination: {
+      ...recurrence.termination,
+      until: recurrence.termination.until
+        ? Timestamp.fromDate(recurrence.termination.until)
+        : null,
     },
-    (error) => onError(error),
+  };
+}
+
+export function encodeCreateEventDocument(
+  input: CreateEventInput,
+  lifecycleTimestamp: unknown,
+) {
+  return {
+    title: input.title.trim(),
+    notes: input.notes,
+    kind: input.kind,
+    startsAt: Timestamp.fromDate(input.startsAt),
+    endsAt: input.endsAt ? Timestamp.fromDate(input.endsAt) : null,
+    allDay: input.allDay,
+    timeZone: input.timeZone,
+    recurrence: encodeRecurrence(input.recurrence),
+    createdAt: lifecycleTimestamp,
+    updatedAt: lifecycleTimestamp,
+  };
+}
+
+export async function createEvent(
+  db: Firestore,
+  userId: string,
+  input: CreateEventInput,
+) {
+  const now = new Date();
+  decodeEventDocument("new-event", {
+    ...input,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  const eventReference = doc(collection(db, "users", userId, "events"));
+  const lifecycleTimestamp = serverTimestamp();
+  await setDoc(
+    eventReference,
+    encodeCreateEventDocument(input, lifecycleTimestamp),
   );
+  return eventReference.id;
 }
 
 export async function seedEmulatorEvents(
@@ -335,18 +445,9 @@ export async function seedEmulatorEvents(
   const batch = writeBatch(db);
 
   events.forEach((event) => {
-    batch.set(doc(db, "users", userId, "events", event.id), {
-      title: event.title,
-      notes: event.notes,
-      kind: event.kind,
-      startsAt: Timestamp.fromDate(event.startsAt),
-      endsAt: event.endsAt ? Timestamp.fromDate(event.endsAt) : null,
-      allDay: event.allDay,
-      timeZone: event.timeZone,
-      recurrence: null,
-      createdAt: Timestamp.fromDate(event.createdAt),
-      updatedAt: Timestamp.fromDate(event.updatedAt),
-    });
+    const document = encodeCreateEventDocument(event, Timestamp.fromDate(event.createdAt));
+    document.updatedAt = Timestamp.fromDate(event.updatedAt);
+    batch.set(doc(db, "users", userId, "events", event.id), document);
   });
 
   await batch.commit();

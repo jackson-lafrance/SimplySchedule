@@ -1,5 +1,5 @@
 import { StatusBar } from "expo-status-bar";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import AgendaView from "@/components/AgendaView";
+import CreateEventScreen from "@/components/CreateEventScreen";
 import EventList from "@/components/EventList";
 import MonthGrid from "@/components/MonthGrid";
 import { useSchedule } from "@/context/useSchedule";
@@ -22,9 +23,11 @@ import {
   getMonthDays,
   localDateKey,
   startOfMonth,
+  visibleRangeForMonth,
   type CalendarDay,
 } from "@/domain/calendar";
-import type { CalendarView } from "@/domain/events";
+import type { CalendarView, CreateEventInput } from "@/domain/events";
+import { expandEventsInRange } from "@/domain/recurrence";
 import { colors, radii, spacing, typography } from "@/theme";
 
 const monthFormatter = new Intl.DateTimeFormat("en-US", {
@@ -45,12 +48,14 @@ const fullDateFormatter = new Intl.DateTimeFormat("en-US", {
 
 export default function HomeScreen() {
   const {
-    events,
+    events: canonicalEvents,
     status,
     source,
     errorMessage,
     lastUpdatedAt,
+    createEvent,
     retry,
+    setVisibleRange,
   } = useSchedule();
   const [today] = useState(() => new Date());
   const [anchorDate, setAnchorDate] = useState(() => startOfMonth(today));
@@ -58,8 +63,17 @@ export default function HomeScreen() {
     () => new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12),
   );
   const [view, setView] = useState<CalendarView>("month");
+  const [creating, setCreating] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
+  const visibleRange = useMemo(
+    () => visibleRangeForMonth(anchorDate),
+    [anchorDate],
+  );
+  const events = useMemo(
+    () => expandEventsInRange(canonicalEvents, visibleRange),
+    [canonicalEvents, visibleRange],
+  );
   const monthDays = useMemo(
     () => getMonthDays(anchorDate, today),
     [anchorDate, today],
@@ -76,6 +90,10 @@ export default function HomeScreen() {
     () => countEventsInMonth(anchorDate, events),
     [anchorDate, events],
   );
+
+  useEffect(() => {
+    setVisibleRange(visibleRange);
+  }, [setVisibleRange, visibleRange]);
 
   const showDateAtTop = (date: Date) => {
     setAnchorDate(startOfMonth(date));
@@ -101,6 +119,20 @@ export default function HomeScreen() {
     }
   };
 
+  const saveEvent = async (input: CreateEventInput) => {
+    await createEvent(input);
+    const eventDate = new Date(
+      input.startsAt.getFullYear(),
+      input.startsAt.getMonth(),
+      input.startsAt.getDate(),
+      12,
+    );
+    setAnchorDate(startOfMonth(eventDate));
+    setSelectedDate(eventDate);
+    setView("month");
+    setCreating(false);
+  };
+
   const sourceLabel =
     status === "loading"
       ? "SYNCING"
@@ -109,6 +141,19 @@ export default function HomeScreen() {
         : source === "firebase"
           ? "FIREBASE LIVE"
           : "LOCAL PREVIEW";
+
+  if (creating) {
+    return (
+      <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
+        <StatusBar style="dark" />
+        <CreateEventScreen
+          initialDate={localDateKey(selectedDate)}
+          onCancel={() => setCreating(false)}
+          onSave={saveEvent}
+        />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
@@ -164,23 +209,37 @@ export default function HomeScreen() {
               {scheduledEntryCount} SCHEDULED {scheduledEntryCount === 1 ? "ENTRY" : "ENTRIES"}
             </Text>
           </View>
-          <Pressable
-            accessibilityRole="button"
-            onPress={goToToday}
-            style={({ pressed }) => [
-              styles.todayButton,
-              pressed && styles.primaryPressed,
-            ]}
-          >
-            <Text style={styles.todayButtonText}>TODAY</Text>
-          </Pressable>
+          <View style={styles.introActions}>
+            <Pressable
+              accessibilityLabel="Create event"
+              accessibilityRole="button"
+              onPress={() => setCreating(true)}
+              style={({ pressed }) => [
+                styles.createButton,
+                pressed && styles.primaryPressed,
+              ]}
+              testID="create-event-button"
+            >
+              <Text style={styles.createButtonText}>＋ EVENT</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={goToToday}
+              style={({ pressed }) => [
+                styles.todayButton,
+                pressed && styles.primaryPressed,
+              ]}
+            >
+              <Text style={styles.todayButtonText}>TODAY</Text>
+            </Pressable>
+          </View>
         </View>
 
         {source === "preview" ? (
           <View accessibilityRole="summary" style={styles.previewNotice}>
             <Text style={styles.noticeTitle}>LOCAL PREVIEW</Text>
             <Text style={styles.noticeBody}>
-              ADD THE EXPO FIREBASE ENVIRONMENT VALUES TO VIEW THE SHARED SCHEDULE.
+              EVENTS CREATED HERE LAST FOR THIS APP SESSION. ADD THE EXPO FIREBASE VALUES TO USE THE SHARED SCHEDULE.
             </Text>
           </View>
         ) : null}
@@ -318,8 +377,8 @@ export default function HomeScreen() {
             <Text style={styles.eyebrow}>CALENDAR DATA</Text>
             <Text style={styles.dataNoteBody}>
               {source === "firebase"
-                ? "READING USER-SCOPED SINGLE EVENTS FROM FIRESTORE."
-                : "SHOWING LOCAL VIEW-ONLY SAMPLE EVENTS."}
+                ? "READING AND WRITING USER-SCOPED EVENTS IN THE VISIBLE SIX-WEEK RANGE."
+                : "SHOWING SAMPLE AND SESSION-ONLY CREATED EVENTS."}
             </Text>
           </View>
           <Text style={styles.updatedAt}>
@@ -334,7 +393,7 @@ export default function HomeScreen() {
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>SIMPLY SCHEDULE</Text>
-          <Text style={styles.footerText}>IOS CALENDAR · VIEW-ONLY PASS</Text>
+          <Text style={styles.footerText}>IOS CALENDAR · CREATE + REPEAT</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -443,9 +502,29 @@ const styles = StyleSheet.create({
     color: colors.muted,
     marginTop: spacing.xs,
   },
+  introActions: {
+    alignItems: "stretch",
+    gap: spacing.xs,
+  },
+  createButton: {
+    minHeight: 44,
+    minWidth: 92,
+    borderWidth: 2,
+    borderColor: colors.ink,
+    borderRadius: radii.control,
+    backgroundColor: colors.accent,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.sm,
+  },
+  createButtonText: {
+    ...typography.body,
+    color: colors.inverse,
+    fontSize: 13,
+  },
   todayButton: {
     minHeight: 44,
-    minWidth: 78,
+    minWidth: 92,
     borderWidth: 2,
     borderColor: colors.ink,
     borderRadius: radii.control,

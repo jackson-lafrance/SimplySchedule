@@ -1,6 +1,6 @@
 # Simply Schedule
 
-Simply Schedule is a cross-platform scheduling app. The repository currently contains the first runnable foundation for the iPhone app in [`mobile/`](./mobile).
+Simply Schedule is a cross-platform scheduling app with coordinated React web and React Native iOS calendar/event workflows.
 
 ## Mobile
 
@@ -12,7 +12,7 @@ npm install
 npm run ios
 ```
 
-The iPhone client now provides month and agenda calendar viewing with Firebase-backed, user-scoped single-event snapshots and an explicit local preview mode. Event creation and recurrence expansion remain for the next iOS phase.
+The iPhone client provides month and agenda views, a Simply-styled timed/all-day event form, canonical user-scoped Firebase writes, visible six-week range reads, and bounded recurrence for first-of-month, third-Friday, two-day, three-day, and five-hour schedules. Local preview creation remains session-only.
 
 ## Web
 

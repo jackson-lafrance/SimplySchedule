@@ -1,4 +1,4 @@
-import type { CalendarEvent, SingleEvent } from "@/domain/events";
+import type { EventOccurrence, VisibleRange } from "@/domain/events";
 
 export const WEEK_STARTS_ON = 0;
 export const DAYS_IN_MONTH_GRID = 42;
@@ -13,7 +13,7 @@ export type CalendarDay = {
 
 export type AgendaDay = {
   day: CalendarDay;
-  events: SingleEvent[];
+  events: EventOccurrence[];
 };
 
 const dateFormatters = new Map<string, Intl.DateTimeFormat>();
@@ -108,13 +108,23 @@ export function getMonthDays(
   });
 }
 
-export function eventOccursOnDate(event: CalendarEvent, date: Date) {
-  // Recurring series are expanded in the later creation/recurrence phase.
-  // Showing only a series seed would misrepresent the user's schedule.
-  if (event.kind === "repeating") {
-    return false;
-  }
+export function visibleRangeForMonth(anchorDate: Date): VisibleRange {
+  const firstDay = getMonthDays(anchorDate)[0].date;
+  const start = new Date(
+    firstDay.getFullYear(),
+    firstDay.getMonth(),
+    firstDay.getDate(),
+  );
+  const end = new Date(
+    start.getFullYear(),
+    start.getMonth(),
+    start.getDate() + DAYS_IN_MONTH_GRID,
+  );
 
+  return { start, end };
+}
+
+export function eventOccursOnDate(event: EventOccurrence, date: Date) {
   if (event.allDay) {
     const selectedKey = localDateKey(date);
     const startKey = dateKeyInTimeZone(event.startsAt, event.timeZone);
@@ -147,7 +157,7 @@ export function eventOccursOnDate(event: CalendarEvent, date: Date) {
   return event.startsAt < dayEnd && event.endsAt > dayStart;
 }
 
-export function sortEvents(events: SingleEvent[]) {
+export function sortEvents(events: EventOccurrence[]) {
   return [...events].sort((left, right) => {
     if (left.allDay !== right.allDay) {
       return left.allDay ? -1 : 1;
@@ -158,18 +168,13 @@ export function sortEvents(events: SingleEvent[]) {
   });
 }
 
-export function eventsForDate(events: CalendarEvent[], date: Date) {
-  return sortEvents(
-    events.filter(
-      (event): event is SingleEvent =>
-        event.kind === "single" && eventOccursOnDate(event, date),
-    ),
-  );
+export function eventsForDate(events: EventOccurrence[], date: Date) {
+  return sortEvents(events.filter((event) => eventOccursOnDate(event, date)));
 }
 
 export function getMonthAgenda(
   anchorDate: Date,
-  events: CalendarEvent[],
+  events: EventOccurrence[],
   today = new Date(),
 ): AgendaDay[] {
   const year = anchorDate.getFullYear();
@@ -194,7 +199,10 @@ export function getMonthAgenda(
   }).filter((agendaDay) => agendaDay.events.length > 0);
 }
 
-export function countEventsInMonth(anchorDate: Date, events: CalendarEvent[]) {
+export function countEventsInMonth(
+  anchorDate: Date,
+  events: EventOccurrence[],
+) {
   return getMonthAgenda(anchorDate, events).reduce(
     (count, day) => count + day.events.length,
     0,

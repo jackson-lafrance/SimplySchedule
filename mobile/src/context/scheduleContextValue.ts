@@ -1,12 +1,16 @@
 import { createContext } from "react";
 
-import type { SingleEvent } from "@/domain/events";
+import type {
+  CalendarEvent,
+  CreateEventInput,
+  VisibleRange,
+} from "@/domain/events";
 
 export type ScheduleStatus = "loading" | "ready" | "error";
-export type ScheduleSource = "preview" | "firebase";
+export type ScheduleSource = "firebase" | "preview";
 
 export type ScheduleState = {
-  events: SingleEvent[];
+  events: CalendarEvent[];
   status: ScheduleStatus;
   source: ScheduleSource;
   errorMessage: string | null;
@@ -14,6 +18,9 @@ export type ScheduleState = {
 };
 
 export type ScheduleContextValue = ScheduleState & {
+  visibleRange: VisibleRange;
+  setVisibleRange: (range: VisibleRange) => void;
+  createEvent: (input: CreateEventInput) => Promise<string>;
   retry: () => void;
 };
 
