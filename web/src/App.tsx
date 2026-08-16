@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
+import AgendaRows from "@/components/AgendaRows";
 import CreateEventScreen from "@/components/CreateEventScreen";
-import EventList from "@/components/EventList";
 import HomeView from "@/components/HomeView";
 import MonthGrid from "@/components/MonthGrid";
 import ProfilePanel from "@/components/ProfilePanel";
@@ -17,19 +17,21 @@ import {
   localDateKey,
   startOfMonth,
   startOfWeek,
+  tasksForDate,
   visibleRangeForDay,
-  visibleRangeForDays,
   visibleRangeForMonth,
   visibleRangeForWeek,
   type CalendarDay,
+  type WeekStart,
 } from "@/domain/calendar";
 import type { CalendarView, CreateEventInput } from "@/domain/events";
 import { expandEventsInRange } from "@/domain/recurrence";
 
 type AppSection = "home" | "calendar" | "settings";
-type IconName = AppSection | "profile" | "add";
+type IconName = AppSection | "profile";
 
 const CALENDAR_VIEW_STORAGE_KEY = "simplySchedule:calendarView";
+const WEEK_START_STORAGE_KEY = "simplySchedule:weekStartsOn";
 
 function storedCalendarView(): CalendarView {
   try {
@@ -39,6 +41,14 @@ function storedCalendarView(): CalendarView {
       : "week";
   } catch {
     return "week";
+  }
+}
+
+function storedWeekStart(): WeekStart {
+  try {
+    return window.localStorage.getItem(WEEK_START_STORAGE_KEY) === "0" ? 0 : 1;
+  } catch {
+    return 1;
   }
 }
 
@@ -72,10 +82,7 @@ function NavigationIcon({ name }: { name: IconName }) {
       </>
     );
   }
-  if (name === "profile") {
-    return <><circle cx="12" cy="8" r="4" /><path d="M4 21c1-5 4-7 8-7s7 2 8 7" /></>;
-  }
-  return <path d="M12 5v14M5 12h14" />;
+  return <><circle cx="12" cy="8" r="4" /><path d="M4 21c1-5 4-7 8-7s7 2 8 7" /></>;
 }
 
 function Icon({ name }: { name: IconName }) {
@@ -88,7 +95,11 @@ function Icon({ name }: { name: IconName }) {
   );
 }
 
-function titleForRange(view: CalendarView, selectedDate: Date) {
+function titleForRange(
+  view: CalendarView,
+  selectedDate: Date,
+  weekStartsOn: WeekStart,
+) {
   if (view === "day") {
     return fullDateFormatter.format(selectedDate);
   }
@@ -96,7 +107,7 @@ function titleForRange(view: CalendarView, selectedDate: Date) {
     return monthFormatter.format(selectedDate);
   }
 
-  const weekStart = startOfWeek(selectedDate);
+  const weekStart = startOfWeek(selectedDate, weekStartsOn);
   const weekEnd = addDays(weekStart, 6);
   return `${shortDateFormatter.format(weekStart)} – ${shortDateFormatter.format(weekEnd)}`;
 }
@@ -104,6 +115,7 @@ function titleForRange(view: CalendarView, selectedDate: Date) {
 export default function App() {
   const {
     events,
+    tasks,
     status,
     source,
     errorMessage,
@@ -125,6 +137,17 @@ export default function App() {
       // The current session still works when browser storage is unavailable.
     }
   };
+  const [weekStartsOn, setWeekStartsOnState] = useState<WeekStart>(
+    storedWeekStart,
+  );
+  const setWeekStartsOn = (value: WeekStart) => {
+    setWeekStartsOnState(value);
+    try {
+      window.localStorage.setItem(WEEK_START_STORAGE_KEY, String(value));
+    } catch {
+      // The current session still works when browser storage is unavailable.
+    }
+  };
   const [selectedDate, setSelectedDate] = useState(
     () => new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12),
   );
@@ -134,16 +157,16 @@ export default function App() {
 
   const visibleRange = useMemo(() => {
     if (activeSection !== "calendar") {
-      return visibleRangeForDays(today, 8);
+      return visibleRangeForWeek(today, weekStartsOn);
     }
     if (calendarView === "day") {
       return visibleRangeForDay(selectedDate);
     }
     if (calendarView === "week") {
-      return visibleRangeForWeek(selectedDate);
+      return visibleRangeForWeek(selectedDate, weekStartsOn);
     }
-    return visibleRangeForMonth(selectedDate);
-  }, [activeSection, calendarView, selectedDate, today]);
+    return visibleRangeForMonth(selectedDate, weekStartsOn);
+  }, [activeSection, calendarView, selectedDate, today, weekStartsOn]);
 
   useEffect(() => setVisibleRange(visibleRange), [setVisibleRange, visibleRange]);
 
@@ -155,21 +178,18 @@ export default function App() {
     () => eventsForDate(occurrences, selectedDate),
     [occurrences, selectedDate],
   );
+  const selectedTasks = useMemo(
+    () => tasksForDate(tasks, selectedDate),
+    [selectedDate, tasks],
+  );
   const monthDays = useMemo(
-    () => getMonthDays(selectedDate, today),
-    [selectedDate, today],
+    () => getMonthDays(selectedDate, today, weekStartsOn),
+    [selectedDate, today, weekStartsOn],
   );
   const weekDays = useMemo(
-    () => getWeekDays(selectedDate, occurrences, today),
-    [occurrences, selectedDate, today],
+    () => getWeekDays(selectedDate, occurrences, today, weekStartsOn),
+    [occurrences, selectedDate, today, weekStartsOn],
   );
-
-  const goToToday = () => {
-    const now = new Date();
-    setSelectedDate(
-      new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12),
-    );
-  };
 
   const moveCalendar = (amount: number) => {
     if (calendarView === "day") {
@@ -226,9 +246,13 @@ export default function App() {
 
       <div className="app-body">
         <aside className="navigation-shelf">
-          <button className="add-event-button" onClick={openCreateEvent} type="button">
-            <Icon name="add" />
-            <span>Add event</span>
+          <button
+            aria-label="+ SCHEDULE"
+            className="add-event-button"
+            onClick={openCreateEvent}
+            type="button"
+          >
+            <span>+ SCHEDULE</span>
           </button>
           <nav className="section-tabs" aria-label="Primary navigation">
             {(["home", "calendar", "settings"] as AppSection[]).map((section) => (
@@ -262,7 +286,12 @@ export default function App() {
           ) : null}
 
           {activeSection === "home" ? (
-            <HomeView occurrences={occurrences} today={today} />
+            <HomeView
+              occurrences={occurrences}
+              tasks={tasks}
+              today={today}
+              weekStartsOn={weekStartsOn}
+            />
           ) : null}
 
           {activeSection === "calendar" ? (
@@ -304,11 +333,10 @@ export default function App() {
                   </button>
                   <div>
                     <p className="eyebrow">Viewing</p>
-                    <h2>{titleForRange(calendarView, selectedDate)}</h2>
+                    <h2>
+                      {titleForRange(calendarView, selectedDate, weekStartsOn)}
+                    </h2>
                   </div>
-                  <button className="today-button" onClick={goToToday} type="button">
-                    Today
-                  </button>
                   <button
                     aria-label={`Next ${calendarView}`}
                     className="icon-button"
@@ -330,12 +358,13 @@ export default function App() {
                         <p className="eyebrow">Agenda</p>
                         <h2>{fullDateFormatter.format(selectedDate)}</h2>
                       </div>
-                      <span className="section-count">{selectedEvents.length}</span>
+                      <span className="section-count">
+                        {selectedEvents.length + selectedTasks.length}
+                      </span>
                     </div>
-                    <EventList
-                      emptyMessage="NO EVENTS SCHEDULED."
+                    <AgendaRows
                       events={selectedEvents}
-                      showNotes
+                      tasks={selectedTasks}
                     />
                   </div>
                 ) : null}
@@ -343,6 +372,7 @@ export default function App() {
                 {calendarView === "week" ? (
                   <WeekView
                     days={weekDays}
+                    tasks={tasks}
                     onSelectDay={(date) => {
                       setSelectedDate(date);
                       setCalendarView("day");
@@ -355,8 +385,10 @@ export default function App() {
                     <MonthGrid
                       days={monthDays}
                       events={occurrences}
+                      tasks={tasks}
                       onSelectDay={selectMonthDay}
                       selectedKey={localDateKey(selectedDate)}
+                      weekStartsOn={weekStartsOn}
                     />
                     <section className="month-selected-day">
                       <div className="section-heading">
@@ -364,11 +396,13 @@ export default function App() {
                           <p className="eyebrow">Selected day</p>
                           <h2>{fullDateFormatter.format(selectedDate)}</h2>
                         </div>
-                        <span className="section-count">{selectedEvents.length}</span>
+                        <span className="section-count">
+                          {selectedEvents.length + selectedTasks.length}
+                        </span>
                       </div>
-                      <EventList
-                        emptyMessage="NO EVENTS SCHEDULED."
+                      <AgendaRows
                         events={selectedEvents}
+                        tasks={selectedTasks}
                       />
                     </section>
                   </div>
@@ -381,8 +415,10 @@ export default function App() {
             <SettingsView
               calendarView={calendarView}
               onCalendarViewChange={setCalendarView}
+              onWeekStartChange={setWeekStartsOn}
               source={source}
               status={status}
+              weekStartsOn={weekStartsOn}
             />
           ) : null}
         </main>

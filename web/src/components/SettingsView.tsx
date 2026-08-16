@@ -1,3 +1,4 @@
+import type { WeekStart } from "@/domain/calendar";
 import type {
   CalendarView,
 } from "@/domain/events";
@@ -9,13 +10,17 @@ import type {
 export default function SettingsView({
   calendarView,
   onCalendarViewChange,
+  onWeekStartChange,
   source,
   status,
+  weekStartsOn,
 }: {
   calendarView: CalendarView;
   onCalendarViewChange: (view: CalendarView) => void;
+  onWeekStartChange: (value: WeekStart) => void;
   source: ScheduleSource;
   status: ScheduleStatus;
+  weekStartsOn: WeekStart;
 }) {
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 
@@ -28,6 +33,23 @@ export default function SettingsView({
       </header>
 
       <div className="settings-list">
+        <label className="setting-card">
+          <span>
+            <strong>Week start</strong>
+            <small>Used by Home, week, and month views.</small>
+          </span>
+          <select
+            aria-label="Week starts on"
+            onChange={(event) =>
+              onWeekStartChange(event.target.value === "0" ? 0 : 1)
+            }
+            value={weekStartsOn}
+          >
+            <option value={1}>Monday</option>
+            <option value={0}>Sunday</option>
+          </select>
+        </label>
+
         <label className="setting-card">
           <span>
             <strong>Default calendar view</strong>

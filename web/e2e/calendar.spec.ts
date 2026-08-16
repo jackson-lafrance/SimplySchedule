@@ -30,7 +30,7 @@ async function expectFirebaseSource(page: Page) {
 }
 
 async function createFiveHourlyEvent(page: Page, title: string) {
-  await page.getByRole("button", { name: "Add event" }).click();
+  await page.getByRole("button", { name: "+ SCHEDULE" }).click();
   await expect(
     page.getByRole("heading", { level: 2, name: "New event" }),
   ).toBeVisible();
@@ -50,10 +50,7 @@ async function createFiveHourlyEvent(page: Page, title: string) {
 
   await expect(page.getByText("REPEATING EVENT SAVED.", { exact: true })).toBeVisible();
   await expect(
-    page.locator(".home-agenda-card").getByText(title, { exact: true }),
-  ).toHaveCount(4);
-  await expect(
-    page.locator(".home-agenda-card").getByText("↻ REPEATS", { exact: true }),
+    page.locator(".weekly-agenda-scroll").getByText(title, { exact: true }),
   ).toHaveCount(4);
 }
 
@@ -68,8 +65,19 @@ test("moves through the restrained Home, Calendar, and Settings hierarchy", asyn
 
   await page.goto("/");
 
-  await expect(page.getByRole("heading", { level: 1, name: "Today" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "+ SCHEDULE" }),
+  ).toHaveText("+ SCHEDULE");
+  await expect(
+    page.getByRole("heading", { level: 1, name: "This week" }),
+  ).toHaveCount(1);
+  await expect(page.locator(".agenda-date-section")).toHaveCount(7);
+  await expect(page.locator(".agenda-date-current")).toHaveCount(1);
   await expect(page.getByText("Weekly plan", { exact: true }).first()).toBeVisible();
+  await expect(
+    page.getByText("Send meeting agenda", { exact: true }).first(),
+  ).toBeVisible();
+  await expect(page.getByText("NOTHING SCHEDULED", { exact: true })).toHaveCount(6);
 
   await page.getByRole("button", { name: "Open profile" }).click();
   await expect(page.getByRole("heading", { level: 2, name: "Profile" })).toBeVisible();
@@ -86,6 +94,8 @@ test("moves through the restrained Home, Calendar, and Settings hierarchy", asyn
 
   await page.getByRole("button", { name: "month", exact: true }).click();
   await expect(page.getByRole("heading", { level: 2, name: currentMonth })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Today", exact: true })).toHaveCount(0);
+  await expect(page.locator(".calendar-today-dot")).toHaveCount(1);
   await page.getByRole("button", { name: "Next month" }).click();
   await expect(page.getByRole("heading", { level: 2, name: nextMonth })).toBeVisible();
 
@@ -100,7 +110,7 @@ test("moves through the restrained Home, Calendar, and Settings hierarchy", asyn
 test("creates an event quickly and discloses expressive recurrence", async ({ page }) => {
   await page.goto("/");
 
-  await page.getByRole("button", { name: "Add event" }).click();
+  await page.getByRole("button", { name: "+ SCHEDULE" }).click();
   await page.getByLabel("Start anchor").fill("2026-09-04");
   await page.getByLabel("Repeat unit").selectOption("monthly");
   await expect(page.getByLabel("Day of month")).toHaveValue("4");
@@ -126,8 +136,8 @@ test("keeps modal sheets keyboard-safe and confirms dirty cancellation", async (
 }) => {
   await page.goto("/");
 
-  const addEvent = page.getByRole("button", { name: "Add event" });
-  await addEvent.click();
+  const scheduleAction = page.getByRole("button", { name: "+ SCHEDULE" });
+  await scheduleAction.click();
   const title = page.getByLabel("Title");
   await expect(title).toBeFocused();
   await page.keyboard.press("Shift+Tab");
@@ -153,7 +163,7 @@ test("keeps modal sheets keyboard-safe and confirms dirty cancellation", async (
   await expect(
     page.getByRole("heading", { level: 2, name: "New event" }),
   ).toHaveCount(0);
-  await expect(addEvent).toBeFocused();
+  await expect(scheduleAction).toBeFocused();
 
   const profile = page.getByRole("button", { name: "Open profile" });
   await profile.click();
@@ -162,6 +172,26 @@ test("keeps modal sheets keyboard-safe and confirms dirty cancellation", async (
     page.getByRole("heading", { level: 2, name: "Profile" }),
   ).toHaveCount(0);
   await expect(profile).toBeFocused();
+});
+
+test("positions the picker-free mobile agenda at the current day", async ({
+  page,
+}) => {
+  await page.clock.setFixedTime(new Date("2026-08-19T16:00:00.000Z"));
+  await page.goto("/");
+
+  await expect(page.locator(".agenda-date-section")).toHaveCount(7);
+  await expect(page.locator(".agenda-date-current")).toHaveAttribute(
+    "data-date",
+    "2026-08-19",
+  );
+  if ((page.viewportSize()?.width ?? 1_000) <= 720) {
+    await expect
+      .poll(() =>
+        page.locator(".weekly-agenda-scroll").evaluate((element) => element.scrollTop),
+      )
+      .toBeGreaterThan(0);
+  }
 });
 
 test("persists the calendar default and avoids horizontal overflow", async ({
@@ -184,13 +214,17 @@ test("persists the calendar default and avoids horizontal overflow", async ({
       ),
     )
     .toBe(true);
-  await expect(page.getByRole("button", { name: "Add event" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "+ SCHEDULE" }),
+  ).toBeVisible();
 
   await page.getByRole("button", { name: "settings", exact: true }).click();
+  await page.getByLabel("Week starts on").selectOption("0");
   await page.getByLabel("Default calendar view").selectOption("month");
   await page.reload();
   await page.getByRole("button", { name: "calendar", exact: true }).click();
   await expect(page.getByRole("region", { name: "Month calendar" })).toBeVisible();
+  await expect(page.locator(".weekday-row span").first()).toHaveText("Sun");
 });
 
 test("has no automated WCAG violations across primary views and the editor", async ({
@@ -206,7 +240,7 @@ test("has no automated WCAG violations across primary views and the editor", asy
   await page.getByRole("button", { name: "settings", exact: true }).click();
   await expectNoAccessibilityViolations(page);
 
-  await page.getByRole("button", { name: "Add event" }).click();
+  await page.getByRole("button", { name: "+ SCHEDULE" }).click();
   await expectNoAccessibilityViolations(page);
 });
 
@@ -224,7 +258,7 @@ test("persists a created recurrence through Firebase rules", async ({ page }) =>
 
   await expectFirebaseSource(page);
   await expect(
-    page.locator(".home-agenda-card").getByText("Firebase recurrence proof", {
+    page.locator(".weekly-agenda-scroll").getByText("Firebase recurrence proof", {
       exact: true,
     }),
   ).toHaveCount(4);

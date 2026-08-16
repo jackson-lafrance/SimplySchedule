@@ -61,7 +61,7 @@ export default function ProfilePanel({
           <p>
             {source === "firebase"
               ? "Signed in with an anonymous, user-scoped Firebase session."
-              : "Events stay in this browser session and are never uploaded."}
+              : "Tasks and events stay in this browser session and are never uploaded."}
           </p>
           {lastUpdatedAt ? (
             <code>

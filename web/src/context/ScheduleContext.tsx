@@ -13,6 +13,7 @@ import {
 } from "@/context/scheduleContextValue";
 import { visibleRangeForMonth } from "@/domain/calendar";
 import { createDemoEvents } from "@/domain/demoEvents";
+import { createDemoTasks } from "@/domain/demoTasks";
 import type { CreateEventInput, VisibleRange } from "@/domain/events";
 import { getFirebaseClient, getOrCreateScheduleUser } from "@/lib/firebase";
 import {
@@ -20,12 +21,14 @@ import {
   seedEmulatorEvents,
   subscribeToEventsInRange,
 } from "@/services/eventRepository";
+import { subscribeToTasksInRange } from "@/services/taskRepository";
 
 const configuredClient = getFirebaseClient();
 const previewEvents = createDemoEvents();
 const initialState: ScheduleState = configuredClient
   ? {
       events: [],
+      tasks: [],
       status: "loading",
       source: "firebase",
       errorMessage: null,
@@ -33,6 +36,7 @@ const initialState: ScheduleState = configuredClient
     }
   : {
       events: previewEvents,
+      tasks: createDemoTasks(),
       status: "ready",
       source: "preview",
       errorMessage: null,
@@ -66,17 +70,39 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
     }
 
     let active = true;
-    let unsubscribe: (() => void) | undefined;
+    let failed = false;
+    let eventsReady = false;
+    let tasksReady = false;
+    const unsubscribes: (() => void)[] = [];
 
     const fail = (error: unknown) => {
-      if (!active) {
+      if (!active || failed) {
         return;
       }
-
+      failed = true;
       setState((current) => ({
         ...current,
         status: "error",
         errorMessage: readableScheduleError(error),
+      }));
+    };
+    const markReady = <Key extends "events" | "tasks">(
+      key: Key,
+      value: ScheduleState[Key],
+    ) => {
+      if (!active || failed) {
+        return;
+      }
+      if (key === "events") eventsReady = true;
+      if (key === "tasks") tasksReady = true;
+      const scheduleReady = eventsReady && tasksReady;
+      setState((current) => ({
+        ...current,
+        [key]: value,
+        status: scheduleReady ? "ready" : "loading",
+        source: "firebase",
+        errorMessage: null,
+        lastUpdatedAt: scheduleReady ? new Date() : current.lastUpdatedAt,
       }));
     };
 
@@ -87,45 +113,43 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
         }
         userIdRef.current = user.uid;
 
-        unsubscribe = subscribeToEventsInRange(
-          configuredClient.db,
-          user.uid,
-          visibleRange,
-          (events) => {
-            if (
-              configuredClient.seedEmulator &&
-              events.length === 0 &&
-              !seededEmulatorRef.current
-            ) {
-              seededEmulatorRef.current = true;
-              void seedEmulatorEvents(
-                configuredClient.db,
-                user.uid,
-                createDemoEvents(),
-              ).catch(fail);
-              return;
-            }
-
-            if (!active) {
-              return;
-            }
-
-            setState({
-              events,
-              status: "ready",
-              source: "firebase",
-              errorMessage: null,
-              lastUpdatedAt: new Date(),
-            });
-          },
-          fail,
+        unsubscribes.push(
+          subscribeToEventsInRange(
+            configuredClient.db,
+            user.uid,
+            visibleRange,
+            (events) => {
+              if (
+                configuredClient.seedEmulator &&
+                events.length === 0 &&
+                !seededEmulatorRef.current
+              ) {
+                seededEmulatorRef.current = true;
+                void seedEmulatorEvents(
+                  configuredClient.db,
+                  user.uid,
+                  createDemoEvents(),
+                ).catch(fail);
+                return;
+              }
+              markReady("events", events);
+            },
+            fail,
+          ),
+          subscribeToTasksInRange(
+            configuredClient.db,
+            user.uid,
+            visibleRange,
+            (tasks) => markReady("tasks", tasks),
+            fail,
+          ),
         );
       })
       .catch(fail);
 
     return () => {
       active = false;
-      unsubscribe?.();
+      unsubscribes.forEach((unsubscribe) => unsubscribe());
     };
   }, [loadAttempt, visibleRange]);
 

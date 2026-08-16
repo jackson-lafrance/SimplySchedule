@@ -1,6 +1,9 @@
 import type { EventOccurrence, VisibleRange } from "@/domain/events";
+import type { ScheduleTask } from "@/domain/tasks";
 
-export const WEEK_STARTS_ON = 0;
+export type WeekStart = 0 | 1;
+
+export const WEEK_STARTS_ON: WeekStart = 0;
 export const DAYS_IN_MONTH_GRID = 42;
 
 export type CalendarDay = {
@@ -77,7 +80,10 @@ export function addDays(date: Date, amount: number) {
   );
 }
 
-export function startOfWeek(date: Date, weekStartsOn = WEEK_STARTS_ON) {
+export function startOfWeek(
+  date: Date,
+  weekStartsOn: WeekStart = WEEK_STARTS_ON,
+) {
   const day = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12);
   const offset = (day.getDay() - weekStartsOn + 7) % 7;
   return addDays(day, -offset);
@@ -92,8 +98,11 @@ export function visibleRangeForDay(date: Date): VisibleRange {
   return { start, end: new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1) };
 }
 
-export function visibleRangeForWeek(date: Date): VisibleRange {
-  const weekStart = startOfWeek(date);
+export function visibleRangeForWeek(
+  date: Date,
+  weekStartsOn: WeekStart = WEEK_STARTS_ON,
+): VisibleRange {
+  const weekStart = startOfWeek(date, weekStartsOn);
   return {
     start: startOfDay(weekStart),
     end: startOfDay(addDays(weekStart, 7)),
@@ -108,8 +117,11 @@ export function visibleRangeForDays(date: Date, dayCount: number): VisibleRange 
   };
 }
 
-export function visibleRangeForMonth(anchorDate: Date): VisibleRange {
-  const days = getMonthDays(anchorDate);
+export function visibleRangeForMonth(
+  anchorDate: Date,
+  weekStartsOn: WeekStart = WEEK_STARTS_ON,
+): VisibleRange {
+  const days = getMonthDays(anchorDate, new Date(), weekStartsOn);
   const first = days[0].date;
   const last = days[days.length - 1].date;
 
@@ -130,7 +142,7 @@ export function addMonths(date: Date, amount: number) {
 export function getMonthDays(
   anchorDate: Date,
   today = new Date(),
-  weekStartsOn = WEEK_STARTS_ON,
+  weekStartsOn: WeekStart = WEEK_STARTS_ON,
 ): CalendarDay[] {
   const monthStart = startOfMonth(anchorDate);
   const leadingDays = (monthStart.getDay() - weekStartsOn + 7) % 7;
@@ -211,6 +223,22 @@ export function eventsForDate(events: EventOccurrence[], date: Date) {
   return sortEvents(events.filter((event) => eventOccursOnDate(event, date)));
 }
 
+export function tasksForDate(tasks: ScheduleTask[], date: Date) {
+  const key = localDateKey(date);
+  return tasks
+    .filter(
+      (task) =>
+        task.status === "open" &&
+        task.dueAt !== null &&
+        localDateKey(task.dueAt) === key,
+    )
+    .sort(
+      (left, right) =>
+        (left.dueAt?.getTime() ?? 0) - (right.dueAt?.getTime() ?? 0) ||
+        left.title.localeCompare(right.title),
+    );
+}
+
 export function getAgendaForDays(
   startDate: Date,
   dayCount: number,
@@ -241,8 +269,15 @@ export function getWeekDays(
   anchorDate: Date,
   events: EventOccurrence[],
   today = new Date(),
+  weekStartsOn: WeekStart = WEEK_STARTS_ON,
 ) {
-  return getAgendaForDays(startOfWeek(anchorDate), 7, events, today, true);
+  return getAgendaForDays(
+    startOfWeek(anchorDate, weekStartsOn),
+    7,
+    events,
+    today,
+    true,
+  );
 }
 
 export function getMonthAgenda(
