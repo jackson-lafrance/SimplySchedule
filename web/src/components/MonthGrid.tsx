@@ -1,8 +1,11 @@
 import {
   eventsForDate,
+  tasksForDate,
   type CalendarDay,
+  type WeekStart,
 } from "@/domain/calendar";
 import type { EventOccurrence } from "@/domain/events";
+import type { ScheduleTask } from "@/domain/tasks";
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const accessibleDateFormatter = new Intl.DateTimeFormat("en-US", {
@@ -15,33 +18,45 @@ const accessibleDateFormatter = new Intl.DateTimeFormat("en-US", {
 export default function MonthGrid({
   days,
   events,
+  tasks,
   selectedKey,
+  weekStartsOn,
   onSelectDay,
 }: {
   days: CalendarDay[];
   events: EventOccurrence[];
+  tasks: ScheduleTask[];
   selectedKey: string;
+  weekStartsOn: WeekStart;
   onSelectDay: (day: CalendarDay) => void;
 }) {
+  const weekdays =
+    weekStartsOn === 0
+      ? WEEKDAY_LABELS
+      : [...WEEKDAY_LABELS.slice(1), WEEKDAY_LABELS[0]];
   return (
     <div className="month-grid-wrap">
       <div className="weekday-row" aria-hidden="true">
-        {WEEKDAY_LABELS.map((label) => (
+        {weekdays.map((label) => (
           <span key={label}>{label}</span>
         ))}
       </div>
-      <div className="month-grid" role="grid" aria-label="Month calendar">
+      <div
+        aria-label="Month calendar"
+        className="month-grid"
+        role="region"
+      >
         {days.map((day) => {
-          const dayEvents = eventsForDate(events, day.date);
-          const visibleEvents = dayEvents.slice(0, 3);
-          const hiddenCount = dayEvents.length - visibleEvents.length;
+          const count =
+            eventsForDate(events, day.date).length +
+            tasksForDate(tasks, day.date).length;
           const selected = selectedKey === day.key;
 
           return (
             <button
-              aria-label={`${accessibleDateFormatter.format(day.date)}, ${
-                dayEvents.length
-              } ${dayEvents.length === 1 ? "event" : "events"}`}
+              aria-label={`${accessibleDateFormatter.format(day.date)}, ${count} ${
+                count === 1 ? "item" : "items"
+              }`}
               aria-pressed={selected}
               className={`calendar-day ${
                 day.isCurrentMonth ? "" : "calendar-day-outside"
@@ -50,28 +65,12 @@ export default function MonthGrid({
               }`}
               key={day.key}
               onClick={() => onSelectDay(day)}
-              role="gridcell"
               type="button"
             >
               <span className="day-number">{day.dayNumber}</span>
-              <span className="day-events" aria-hidden="true">
-                {visibleEvents.map((event) => (
-                  <span
-                    className={`day-event ${
-                      event.allDay ? "day-event-all-day" : ""
-                    }`}
-                    key={event.id}
-                  >
-                    {!event.allDay ? (
-                      <span className="day-event-dot" />
-                    ) : null}
-                    <span>{event.title}</span>
-                  </span>
-                ))}
-                {hiddenCount > 0 ? (
-                  <span className="day-event-more">+{hiddenCount} MORE</span>
-                ) : null}
-              </span>
+              {day.isToday ? (
+                <span className="calendar-today-dot" aria-hidden="true" />
+              ) : null}
             </button>
           );
         })}

@@ -1,77 +1,106 @@
-import EventList from "@/components/EventList";
-import { eventsForDate, getAgendaForDays } from "@/domain/calendar";
-import type { EventOccurrence } from "@/domain/events";
+import { useEffect, useMemo, useRef } from "react";
 
-const fullDateFormatter = new Intl.DateTimeFormat("en-US", {
+import AgendaRows from "@/components/AgendaRows";
+import {
+  getWeekDays,
+  localDateKey,
+  tasksForDate,
+  type WeekStart,
+} from "@/domain/calendar";
+import type { EventOccurrence } from "@/domain/events";
+import type { ScheduleTask } from "@/domain/tasks";
+
+const sectionFormatter = new Intl.DateTimeFormat("en-US", {
   weekday: "long",
   month: "long",
   day: "numeric",
 });
 const shortDateFormatter = new Intl.DateTimeFormat("en-US", {
-  weekday: "short",
   month: "short",
   day: "numeric",
 });
 
 export default function HomeView({
   occurrences,
+  tasks,
   today,
+  weekStartsOn,
 }: {
   occurrences: EventOccurrence[];
+  tasks: ScheduleTask[];
   today: Date;
+  weekStartsOn: WeekStart;
 }) {
-  const todayEvents = eventsForDate(occurrences, today);
-  const upcoming = getAgendaForDays(today, 7, occurrences).filter(
-    ({ day }) => !day.isToday,
+  const days = useMemo(
+    () => getWeekDays(today, occurrences, today, weekStartsOn),
+    [occurrences, today, weekStartsOn],
+  );
+  const todayKey = localDateKey(today);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const currentDayRef = useRef<HTMLElement | null>(null);
+  const itemCount = days.reduce(
+    (count, { day, events }) =>
+      count + events.length + tasksForDate(tasks, day.date).length,
+    0,
   );
 
+  useEffect(() => {
+    if (!window.matchMedia("(max-width: 720px)").matches) {
+      return;
+    }
+    const frame = window.requestAnimationFrame(() => {
+      const scroll = scrollRef.current;
+      const currentDay = currentDayRef.current;
+      if (scroll && currentDay) {
+        scroll.scrollTop = Math.max(
+          0,
+          currentDay.offsetTop - scroll.offsetTop - 8,
+        );
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [todayKey]);
+
   return (
-    <div className="screen home-screen">
-      <header className="screen-heading">
-        <p className="eyebrow">{fullDateFormatter.format(today)}</p>
-        <h1>Today</h1>
+    <div className="screen weekly-home-screen">
+      <header className="screen-heading weekly-home-heading">
+        <p className="eyebrow">Current week</p>
+        <h1>This week</h1>
         <p className="screen-summary">
-          {todayEvents.length === 0
-            ? "YOUR DAY IS CLEAR."
-            : `${todayEvents.length} ${todayEvents.length === 1 ? "EVENT" : "EVENTS"} TODAY`}
+          {shortDateFormatter.format(days[0].day.date)}–
+          {shortDateFormatter.format(days[days.length - 1].day.date)} · {itemCount}{" "}
+          {itemCount === 1 ? "ITEM" : "ITEMS"}
         </p>
       </header>
 
-      <section className="home-agenda-card" aria-labelledby="today-agenda-title">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Agenda</p>
-            <h2 id="today-agenda-title">Today</h2>
-          </div>
-          <span className="section-count">{todayEvents.length}</span>
-        </div>
-        <EventList
-          emptyMessage="NO EVENTS TODAY."
-          events={todayEvents}
-          showNotes
-        />
-      </section>
-
-      <section className="upcoming-section" aria-labelledby="upcoming-title">
-        <div className="section-heading section-heading-plain">
-          <div>
-            <p className="eyebrow">Next seven days</p>
-            <h2 id="upcoming-title">Upcoming</h2>
-          </div>
-        </div>
-        {upcoming.length === 0 ? (
-          <div className="plain-empty-state">NO UPCOMING EVENTS.</div>
-        ) : (
-          <div className="upcoming-list">
-            {upcoming.map(({ day, events }) => (
-              <section className="upcoming-day" key={day.key}>
-                <time dateTime={day.key}>{shortDateFormatter.format(day.date)}</time>
-                <EventList emptyMessage="" events={events} />
+      <div
+        aria-label="Current week agenda"
+        className="weekly-agenda-scroll"
+        ref={scrollRef}
+        role="region"
+        tabIndex={0}
+      >
+        <div className="weekly-agenda-sections">
+          {days.map(({ day, events }) => {
+            const current = day.key === todayKey;
+            const dayTasks = tasksForDate(tasks, day.date);
+            return (
+              <section
+                aria-current={current ? "date" : undefined}
+                className={`agenda-date-section ${
+                  current ? "agenda-date-current" : ""
+                }`}
+                data-date={day.key}
+                key={day.key}
+                ref={current ? currentDayRef : undefined}
+              >
+                <h2>{sectionFormatter.format(day.date)}</h2>
+                <AgendaRows events={events} tasks={dayTasks} />
               </section>
-            ))}
-          </div>
-        )}
-      </section>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }

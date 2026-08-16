@@ -1,3 +1,4 @@
+import { useModalDialog } from "@/components/useModalDialog";
 import type {
   ScheduleSource,
   ScheduleStatus,
@@ -14,13 +15,25 @@ export default function ProfilePanel({
   source: ScheduleSource;
   status: ScheduleStatus;
 }) {
+  const dialogRef = useModalDialog(onClose);
+
   return (
-    <div className="profile-overlay" role="presentation">
+    <div
+      className="profile-overlay"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
+      role="presentation"
+    >
       <section
         aria-labelledby="profile-title"
         aria-modal="true"
         className="profile-panel"
+        ref={dialogRef}
         role="dialog"
+        tabIndex={-1}
       >
         <div className="sheet-header">
           <h2 id="profile-title">Profile</h2>
@@ -39,10 +52,16 @@ export default function ProfilePanel({
           <strong>
             {source === "firebase" ? "FIREBASE SYNC" : "LOCAL PREVIEW"}
           </strong>
+          <span
+            className={`profile-sync-state status-word-${status}`}
+            role="status"
+          >
+            {status === "loading" ? "SYNCING" : status === "error" ? "ERROR" : "READY"}
+          </span>
           <p>
             {source === "firebase"
               ? "Signed in with an anonymous, user-scoped Firebase session."
-              : "Events stay in this browser session and are never uploaded."}
+              : "Tasks and events stay in this browser session and are never uploaded."}
           </p>
           {lastUpdatedAt ? (
             <code>

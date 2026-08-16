@@ -1,24 +1,24 @@
-import type { AgendaDay } from "@/domain/calendar";
+import AgendaRows from "@/components/AgendaRows";
+import { tasksForDate, type AgendaDay } from "@/domain/calendar";
+import type { ScheduleTask } from "@/domain/tasks";
 
 const weekdayFormatter = new Intl.DateTimeFormat("en-US", { weekday: "short" });
 const dateFormatter = new Intl.DateTimeFormat("en-US", {
   month: "short",
   day: "numeric",
 });
-const timeFormatter = new Intl.DateTimeFormat("en-US", {
-  hour: "numeric",
-  minute: "2-digit",
-});
 
 export default function WeekView({
   days,
+  tasks,
   onSelectDay,
 }: {
   days: AgendaDay[];
+  tasks: ScheduleTask[];
   onSelectDay: (date: Date) => void;
 }) {
   return (
-    <div className="week-grid" aria-label="Week calendar">
+    <div aria-label="Week calendar" className="week-grid" role="region">
       {days.map(({ day, events }) => (
         <section
           className={`week-day ${day.isToday ? "week-day-today" : ""}`}
@@ -33,21 +33,10 @@ export default function WeekView({
             <span>{weekdayFormatter.format(day.date)}</span>
             <strong>{day.dayNumber}</strong>
           </button>
-          {events.length === 0 ? (
-            <span className="week-day-empty">—</span>
-          ) : (
-            <ol className="week-events">
-              {events.map((event) => (
-                <li key={event.id}>
-                  <time dateTime={event.startsAt.toISOString()}>
-                    {event.allDay ? "ALL DAY" : timeFormatter.format(event.startsAt)}
-                  </time>
-                  <strong>{event.title}</strong>
-                  {event.isRepeating ? <span aria-label="Repeating event">↻</span> : null}
-                </li>
-              ))}
-            </ol>
-          )}
+          <AgendaRows
+            events={events}
+            tasks={tasksForDate(tasks, day.date)}
+          />
         </section>
       ))}
     </div>

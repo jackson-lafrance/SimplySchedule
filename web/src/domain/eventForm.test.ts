@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createEventInputFromDraft,
+  previewEventOccurrences,
   recurrenceSummary,
   type EventDraft,
 } from "@/domain/eventForm";
@@ -191,7 +192,7 @@ describe("event creation normalization", () => {
     );
   });
 
-  it("summarizes expressive rules in plain language", () => {
+  it("summarizes expressive rules and end conditions in plain language", () => {
     expect(
       recurrenceSummary(
         draft({
@@ -203,6 +204,75 @@ describe("event creation normalization", () => {
         }),
       ),
     ).toBe("EVERY 2 MONTHS ON THE FIRST FRIDAY");
+
+    expect(
+      recurrenceSummary(
+        draft({
+          repeatFrequency: "yearly",
+          interval: "2",
+          monthOfYear: "5",
+          calendarPattern: "ordinalWeekday",
+          weekOfMonth: "-1",
+          ordinalWeekday: "1",
+          terminationType: "onDate",
+          untilDate: "2032-05-31",
+        }),
+      ),
+    ).toBe(
+      "EVERY 2 YEARS IN MAY ON THE LAST MONDAY, THROUGH 2032-05-31",
+    );
+  });
+
+  it("previews the next five matching occurrences", () => {
+    const input = createEventInputFromDraft(
+      draft({
+        date: "2026-08-11",
+        repeatFrequency: "monthly",
+        calendarPattern: "ordinalWeekday",
+        weekOfMonth: "1",
+        ordinalWeekday: "5",
+      }),
+      "UTC",
+    );
+
+    expect(
+      previewEventOccurrences(input).map((date) => date.toISOString()),
+    ).toEqual([
+      "2026-09-04T09:00:00.000Z",
+      "2026-10-02T09:00:00.000Z",
+      "2026-11-06T09:00:00.000Z",
+      "2026-12-04T09:00:00.000Z",
+      "2027-01-01T09:00:00.000Z",
+    ]);
+  });
+
+  it("rejects end conditions before the first selector match", () => {
+    expect(() =>
+      createEventInputFromDraft(
+        draft({
+          date: "2026-08-11",
+          repeatFrequency: "monthly",
+          dayOfMonth: "1",
+          terminationType: "onDate",
+          untilDate: "2026-08-15",
+        }),
+        "UTC",
+      ),
+    ).toThrow("FIRST MATCHING OCCURRENCE");
+  });
+
+  it("rejects a yearly selector that can never produce an occurrence", () => {
+    expect(() =>
+      createEventInputFromDraft(
+        draft({
+          date: "2026-02-01",
+          repeatFrequency: "yearly",
+          monthOfYear: "2",
+          dayOfMonth: "31",
+        }),
+        "UTC",
+      ),
+    ).toThrow("DOES NOT PRODUCE AN OCCURRENCE");
   });
 
   it("rejects empty titles, backwards times, invalid intervals, and empty weekdays", () => {

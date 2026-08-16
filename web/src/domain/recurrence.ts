@@ -472,11 +472,13 @@ function expandYearly(
   range: VisibleRange,
   collector: CandidateCollector,
 ) {
+  const seed = zonedDateTimeParts(event.startsAt, event.timeZone);
   let occurrenceNumber = 0;
 
   for (let period = 0; period < MAX_RECURRENCE_ITERATIONS; period += 1) {
+    const candidates = yearlyCandidates(event, period);
     let periodPastRange = false;
-    for (const startsAt of yearlyCandidates(event, period)) {
+    for (const startsAt of candidates) {
       if (startsAt < event.startsAt) {
         continue;
       }
@@ -488,6 +490,21 @@ function expandYearly(
     }
     if (periodPastRange) {
       break;
+    }
+
+    // A legal numeric selector such as February 31 has no candidate in any
+    // year. Stop once an empty period is beyond the requested range rather
+    // than consuming the global defensive iteration ceiling.
+    if (candidates.length === 0) {
+      const year = seed.year + period * event.recurrence.interval;
+      const month = event.recurrence.monthOfYear ?? seed.month;
+      const periodStart = zonedDateTimeToDate(
+        { ...seed, year, month, day: 1 },
+        event.timeZone,
+      );
+      if (periodStart >= range.end) {
+        break;
+      }
     }
   }
 }

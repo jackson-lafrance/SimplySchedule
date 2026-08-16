@@ -5,12 +5,14 @@ import type {
   CreateEventInput,
   VisibleRange,
 } from "@/domain/events";
+import type { ScheduleTask } from "@/domain/tasks";
 
 export type ScheduleStatus = "loading" | "ready" | "error";
 export type ScheduleSource = "firebase" | "preview";
 
 export type ScheduleState = {
   events: CalendarEvent[];
+  tasks: ScheduleTask[];
   status: ScheduleStatus;
   source: ScheduleSource;
   errorMessage: string | null;

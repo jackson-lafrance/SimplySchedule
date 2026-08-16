@@ -9,11 +9,14 @@ import {
   getMonthDays,
   localDateKey,
   startOfWeek,
+  tasksForDate,
   visibleRangeForDay,
+  visibleRangeForDays,
   visibleRangeForMonth,
   visibleRangeForWeek,
 } from "@/domain/calendar";
 import type { EventOccurrence } from "@/domain/events";
+import type { ScheduleTask } from "@/domain/tasks";
 
 function occurrence(
   overrides: Partial<EventOccurrence> = {},
@@ -61,21 +64,56 @@ describe("calendar month navigation", () => {
     expect(localDateKey(new Date(range.end.getTime() - 1))).toBe("2026-09-05");
   });
 
-  it("creates half-open day and Sunday-first week ranges", () => {
+  it("creates half-open multi-day, day, and configurable week ranges", () => {
     const date = new Date(2026, 7, 11, 12);
+    const home = visibleRangeForDays(date, 8);
     const day = visibleRangeForDay(date);
     const week = visibleRangeForWeek(date);
+    const mondayFirstWeek = visibleRangeForWeek(date, 1);
 
+    expect(localDateKey(home.start)).toBe("2026-08-11");
+    expect(localDateKey(home.end)).toBe("2026-08-19");
     expect(localDateKey(day.start)).toBe("2026-08-11");
     expect(localDateKey(day.end)).toBe("2026-08-12");
     expect(localDateKey(startOfWeek(date))).toBe("2026-08-09");
     expect(localDateKey(week.start)).toBe("2026-08-09");
     expect(localDateKey(week.end)).toBe("2026-08-16");
+    expect(localDateKey(mondayFirstWeek.start)).toBe("2026-08-10");
+    expect(localDateKey(mondayFirstWeek.end)).toBe("2026-08-17");
     expect(localDateKey(addDays(date, 3))).toBe("2026-08-14");
   });
 });
 
 describe("event calendar projection", () => {
+  it("sorts only open tasks due on the selected local date", () => {
+    const dueAt = new Date(2026, 7, 11, 11);
+    const task = (overrides: Partial<ScheduleTask>): ScheduleTask => ({
+      id: "task-1",
+      title: "Send agenda",
+      notes: "",
+      status: "open",
+      parentId: null,
+      dueAt,
+      completedAt: null,
+      position: 1,
+      createdAt: dueAt,
+      updatedAt: dueAt,
+      ...overrides,
+    });
+
+    expect(
+      tasksForDate(
+        [
+          task({ id: "later", title: "Later", dueAt: new Date(2026, 7, 11, 15) }),
+          task({ id: "completed", status: "completed" }),
+          task({ id: "earlier", title: "Earlier", dueAt: new Date(2026, 7, 11, 9) }),
+          task({ id: "tomorrow", dueAt: new Date(2026, 7, 12, 9) }),
+        ],
+        new Date(2026, 7, 11, 12),
+      ).map(({ id }) => id),
+    ).toEqual(["earlier", "later"]);
+  });
+
   it("shows a timed event on each local day it overlaps", () => {
     const event = occurrence({
       startsAt: new Date(2026, 7, 11, 23, 30),
