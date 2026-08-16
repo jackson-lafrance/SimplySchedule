@@ -24,7 +24,7 @@ npm install
 npm run dev
 ```
 
-The web client now provides responsive month and agenda views, a Simply-styled event form, canonical user-scoped Firebase writes, visible-range reads, and bounded recurrence for first-of-month, third-Friday, two-day, three-day, and five-hour schedules. Local preview creation remains session-only.
+The web client now provides a restrained Simply Lift-inspired Home/Calendar/Settings shell, agenda-focused Home, day/week/month views, progressive event creation, canonical user-scoped Firebase writes, visible-range reads, and expressive bounded recurrence. Local preview creation remains session-only.
 
 ## Firebase foundation
 

@@ -26,7 +26,7 @@ Every event has exactly these fields:
 | `title` | string | Trimmed display title, 1–200 characters. |
 | `notes` | string | Plain text, empty when unused, at most 5,000 characters. |
 | `kind` | string | `single` or `repeating`. |
-| `startsAt` | timestamp | Timed start instant, or local midnight in `timeZone` for an all-day event. For a series, this is the seed/first occurrence. |
+| `startsAt` | timestamp | Timed start instant, or local midnight in `timeZone` for an all-day event. For a series, this is the recurrence anchor and lower bound. Daily/hourly rules include it; selector-based rules produce their first matching occurrence on or after it. |
 | `endsAt` | timestamp or null | Exclusive end. Must be after `startsAt` when present. Required for all-day events; null means a timed point event. For a series, `endsAt - startsAt` is each occurrence's duration. |
 | `allDay` | boolean | Whether the item uses all-day date boundaries. |
 | `timeZone` | string | IANA zone used for all-day boundaries and recurrence, such as `America/Los_Angeles`. |
@@ -41,7 +41,7 @@ Every event has exactly these fields:
 - All-day starts/ends are interpreted in the event's IANA `timeZone`; `endsAt` is exclusive. A one-day all-day event starts at local midnight and ends at the next local midnight.
 - A timed event with `endsAt: null` is a point event.
 - A timed event intersects a day when `startsAt < dayEnd` and `endsAt > dayStart`; a point event belongs to the day containing `startsAt`.
-- A repeating series seed is never rendered as a standalone event. Both clients expand occurrences only for the current six-week visible range; calculated occurrences are never persisted.
+- A repeating series anchor is never rendered unless it matches the rule. Both clients expand occurrences only for the active visible range; calculated occurrences are never persisted.
 
 ## Recurrence map, version 1
 
@@ -79,13 +79,13 @@ Termination semantics:
 
 - `never`: `until` and `count` are null. Expansion is still bounded to the visible client range.
 - `onDate`: `until` is non-null and inclusive by occurrence start (`occurrence.startsAt <= until`); `count` is null.
-- `afterOccurrences`: positive integer `count`, including the seed/first occurrence; `until` is null.
+- `afterOccurrences`: positive integer `count`, including the first occurrence that matches the rule on or after the anchor; `until` is null.
 - Missing monthly days (for example day 31 in April) are skipped, not clamped.
 - Calendar arithmetic happens in `timeZone`; elapsed UTC hours must not replace local calendar arithmetic for daily/weekly/monthly/yearly rules. Hourly recurrence uses elapsed-hour intervals.
 - Each through-date control stores the end of the chosen local day, so every occurrence start on that date remains included.
-- Monthly preset creation aligns `startsAt` to the next matching first-of-month or third-Friday date; the canonical series seed is therefore its actual first occurrence.
+- Editors may expose the anchor independently from selectors. Web persists the selected anchor; iOS advances its selected anchor to the first matching occurrence before persistence. Both representations expand from the first selector match on or after `startsAt`.
 
-### Required later-phase pattern encodings
+### Required pattern encodings
 
 ```ts
 // First of every month
@@ -111,7 +111,7 @@ The iOS recurrence builder exposes the full version 1 grammar rather than limiti
 
 ## Query and projection contract
 
-Each platform repository uses the displayed six-week range `[rangeStart, rangeEnd)` and combines three user-scoped listeners:
+Each platform repository uses its active visible range `[rangeStart, rangeEnd)` and combines three user-scoped listeners:
 
 ```text
 point single events:
@@ -130,7 +130,7 @@ The committed indexes support these concrete query shapes. The repository conver
 
 Each platform domain expander clips all point/duration occurrences to the same half-open range and emits at most 2,000 occurrences per projection, with a defensive 100,000-iteration ceiling. A repeating occurrence key is `<eventId>@<start-instant-ISO>` so hourly occurrences remain unique through repeated daylight-saving wall times. The occurrence retains its canonical `eventId`; it is not an independently persisted event.
 
-## View-phase seed behavior
+## Runtime and preview behavior
 
 - Missing/incomplete platform Firebase configuration selects an explicit `LOCAL PREVIEW` with the same in-memory single-event fixtures. Created preview events last for the current browser/app session and are never uploaded.
 - Web uses `VITE_FIREBASE_*`; iOS uses `EXPO_PUBLIC_FIREBASE_*`. Both target the Firebase project selected by `.firebaserc` and the emulator ports in `firebase.json`.

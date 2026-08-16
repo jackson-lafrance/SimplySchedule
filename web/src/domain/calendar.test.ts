@@ -1,13 +1,17 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  addDays,
   addMonths,
   eventOccursOnDate,
   eventsForDate,
   getMonthAgenda,
   getMonthDays,
   localDateKey,
+  startOfWeek,
+  visibleRangeForDay,
   visibleRangeForMonth,
+  visibleRangeForWeek,
 } from "@/domain/calendar";
 import type { EventOccurrence } from "@/domain/events";
 
@@ -50,11 +54,24 @@ describe("calendar month navigation", () => {
     expect(localDateKey(previous)).toBe("2025-12-01");
   });
 
-  it("uses the entire six-week grid as its half-open visible range", () => {
+  it("uses the entire six-week grid as its half-open month range", () => {
     const range = visibleRangeForMonth(new Date(2026, 7, 1, 12));
 
     expect(localDateKey(range.start)).toBe("2026-07-26");
     expect(localDateKey(new Date(range.end.getTime() - 1))).toBe("2026-09-05");
+  });
+
+  it("creates half-open day and Sunday-first week ranges", () => {
+    const date = new Date(2026, 7, 11, 12);
+    const day = visibleRangeForDay(date);
+    const week = visibleRangeForWeek(date);
+
+    expect(localDateKey(day.start)).toBe("2026-08-11");
+    expect(localDateKey(day.end)).toBe("2026-08-12");
+    expect(localDateKey(startOfWeek(date))).toBe("2026-08-09");
+    expect(localDateKey(week.start)).toBe("2026-08-09");
+    expect(localDateKey(week.end)).toBe("2026-08-16");
+    expect(localDateKey(addDays(date, 3))).toBe("2026-08-14");
   });
 });
 

@@ -64,8 +64,48 @@ export function dateKeyInTimeZone(date: Date, timeZone: string) {
     : localDateKey(date);
 }
 
+export function startOfDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+export function addDays(date: Date, amount: number) {
+  return new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate() + amount,
+    12,
+  );
+}
+
+export function startOfWeek(date: Date, weekStartsOn = WEEK_STARTS_ON) {
+  const day = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12);
+  const offset = (day.getDay() - weekStartsOn + 7) % 7;
+  return addDays(day, -offset);
+}
+
 export function startOfMonth(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), 1, 12);
+}
+
+export function visibleRangeForDay(date: Date): VisibleRange {
+  const start = startOfDay(date);
+  return { start, end: new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1) };
+}
+
+export function visibleRangeForWeek(date: Date): VisibleRange {
+  const weekStart = startOfWeek(date);
+  return {
+    start: startOfDay(weekStart),
+    end: startOfDay(addDays(weekStart, 7)),
+  };
+}
+
+export function visibleRangeForDays(date: Date, dayCount: number): VisibleRange {
+  const start = startOfDay(date);
+  return {
+    start,
+    end: new Date(start.getFullYear(), start.getMonth(), start.getDate() + dayCount),
+  };
 }
 
 export function visibleRangeForMonth(anchorDate: Date): VisibleRange {
@@ -171,18 +211,17 @@ export function eventsForDate(events: EventOccurrence[], date: Date) {
   return sortEvents(events.filter((event) => eventOccursOnDate(event, date)));
 }
 
-export function getMonthAgenda(
-  anchorDate: Date,
+export function getAgendaForDays(
+  startDate: Date,
+  dayCount: number,
   events: EventOccurrence[],
   today = new Date(),
+  includeEmpty = false,
 ): AgendaDay[] {
-  const year = anchorDate.getFullYear();
-  const month = anchorDate.getMonth();
-  const dayCount = new Date(year, month + 1, 0).getDate();
   const todayKey = localDateKey(today);
 
   return Array.from({ length: dayCount }, (_, index) => {
-    const date = new Date(year, month, index + 1, 12);
+    const date = addDays(startDate, index);
     const key = localDateKey(date);
 
     return {
@@ -195,7 +234,29 @@ export function getMonthAgenda(
       },
       events: eventsForDate(events, date),
     };
-  }).filter((agendaDay) => agendaDay.events.length > 0);
+  }).filter((agendaDay) => includeEmpty || agendaDay.events.length > 0);
+}
+
+export function getWeekDays(
+  anchorDate: Date,
+  events: EventOccurrence[],
+  today = new Date(),
+) {
+  return getAgendaForDays(startOfWeek(anchorDate), 7, events, today, true);
+}
+
+export function getMonthAgenda(
+  anchorDate: Date,
+  events: EventOccurrence[],
+  today = new Date(),
+): AgendaDay[] {
+  const monthStart = startOfMonth(anchorDate);
+  const dayCount = new Date(
+    monthStart.getFullYear(),
+    monthStart.getMonth() + 1,
+    0,
+  ).getDate();
+  return getAgendaForDays(monthStart, dayCount, events, today);
 }
 
 export function countEventsInMonth(anchorDate: Date, events: EventOccurrence[]) {

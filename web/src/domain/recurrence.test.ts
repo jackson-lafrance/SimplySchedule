@@ -90,6 +90,54 @@ describe("bounded recurrence expansion", () => {
     ]);
   });
 
+  it("uses a start anchor as the lower bound for selector-based rules", () => {
+    const event = repeating(
+      rule({ frequency: "monthly", dayOfMonth: 1 }),
+      { startsAt: new Date("2026-08-11T09:00:00.000Z") },
+    );
+
+    expect(
+      isoStarts(event, "2026-08-01T00:00:00.000Z", "2026-10-02T00:00:00.000Z"),
+    ).toEqual([
+      "2026-09-01T09:00:00.000Z",
+      "2026-10-01T09:00:00.000Z",
+    ]);
+  });
+
+  it("supports arbitrary weekly intervals and weekday sets", () => {
+    const event = repeating(
+      rule({ frequency: "weekly", interval: 2, daysOfWeek: [1, 5] }),
+      { startsAt: new Date("2026-01-05T09:00:00.000Z") },
+    );
+
+    expect(
+      isoStarts(event, "2026-01-01T00:00:00.000Z", "2026-02-01T00:00:00.000Z"),
+    ).toEqual([
+      "2026-01-05T09:00:00.000Z",
+      "2026-01-09T09:00:00.000Z",
+      "2026-01-19T09:00:00.000Z",
+      "2026-01-23T09:00:00.000Z",
+    ]);
+  });
+
+  it("supports yearly ordinal weekday selectors", () => {
+    const event = repeating(
+      rule({
+        frequency: "yearly",
+        daysOfWeek: [5],
+        weekOfMonth: 1,
+        monthOfYear: 5,
+      }),
+    );
+
+    expect(
+      isoStarts(event, "2026-01-01T00:00:00.000Z", "2028-01-01T00:00:00.000Z"),
+    ).toEqual([
+      "2026-05-01T09:00:00.000Z",
+      "2027-05-07T09:00:00.000Z",
+    ]);
+  });
+
   it.each([
     [2, [7, 9, 11, 13]],
     [3, [7, 10, 13]],

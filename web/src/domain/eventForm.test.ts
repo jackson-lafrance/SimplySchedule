@@ -1,10 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  alignDateKeyForPreset,
   createEventInputFromDraft,
+  recurrenceSummary,
   type EventDraft,
-  type RecurrencePreset,
 } from "@/domain/eventForm";
 import { zonedDateTimeParts } from "@/domain/recurrence";
 
@@ -16,7 +15,14 @@ function draft(overrides: Partial<EventDraft> = {}): EventDraft {
     startTime: "09:00",
     endTime: "10:00",
     allDay: false,
-    recurrencePreset: "none",
+    repeatFrequency: "none",
+    interval: "1",
+    daysOfWeek: [2],
+    calendarPattern: "dayOfMonth",
+    dayOfMonth: "11",
+    weekOfMonth: "1",
+    ordinalWeekday: "2",
+    monthOfYear: "8",
     terminationType: "never",
     untilDate: "2026-12-31",
     occurrenceCount: "10",
@@ -26,45 +32,126 @@ function draft(overrides: Partial<EventDraft> = {}): EventDraft {
 
 describe("event creation normalization", () => {
   it.each([
-    ["firstOfMonth", "monthly", 1, { dayOfMonth: 1 }],
-    ["thirdFriday", "monthly", 1, { daysOfWeek: [5], weekOfMonth: 3 }],
-    ["everyOtherDay", "daily", 2, {}],
-    ["everyThreeDays", "daily", 3, {}],
-    ["everyFiveHours", "hourly", 5, {}],
-  ] as const)(
-    "encodes %s in the canonical recurrence schema",
-    (preset, frequency, interval, selectors) => {
-      const input = createEventInputFromDraft(
-        draft({ recurrencePreset: preset as RecurrencePreset }),
-        "UTC",
-      );
+    [
+      "first of the month",
+      { repeatFrequency: "monthly", dayOfMonth: "1" },
+      { frequency: "monthly", interval: 1, dayOfMonth: 1 },
+    ],
+    [
+      "first Friday",
+      {
+        repeatFrequency: "monthly",
+        calendarPattern: "ordinalWeekday",
+        weekOfMonth: "1",
+        ordinalWeekday: "5",
+      },
+      {
+        frequency: "monthly",
+        interval: 1,
+        daysOfWeek: [5],
+        weekOfMonth: 1,
+      },
+    ],
+    [
+      "third Friday",
+      {
+        repeatFrequency: "monthly",
+        calendarPattern: "ordinalWeekday",
+        weekOfMonth: "3",
+        ordinalWeekday: "5",
+      },
+      {
+        frequency: "monthly",
+        interval: 1,
+        daysOfWeek: [5],
+        weekOfMonth: 3,
+      },
+    ],
+    [
+      "every other day",
+      { repeatFrequency: "daily", interval: "2" },
+      { frequency: "daily", interval: 2 },
+    ],
+    [
+      "every three days",
+      { repeatFrequency: "daily", interval: "3" },
+      { frequency: "daily", interval: 3 },
+    ],
+    [
+      "every five hours",
+      { repeatFrequency: "hourly", interval: "5" },
+      { frequency: "hourly", interval: 5 },
+    ],
+  ] as const)("encodes %s in the canonical schema", (_, overrides, expected) => {
+    const input = createEventInputFromDraft(
+      draft(overrides as Partial<EventDraft>),
+      "UTC",
+    );
 
-      expect(input.title).toBe("Release check");
-      expect(input.kind).toBe("repeating");
-      expect(input.recurrence).toMatchObject({
-        version: 1,
-        frequency,
-        interval,
-        daysOfWeek: null,
-        dayOfMonth: null,
-        weekOfMonth: null,
-        monthOfYear: null,
-        termination: { type: "never", until: null, count: null },
-        ...selectors,
-      });
-    },
-  );
+    expect(input.title).toBe("Release check");
+    expect(input.kind).toBe("repeating");
+    expect(input.recurrence).toMatchObject({
+      version: 1,
+      daysOfWeek: null,
+      dayOfMonth: null,
+      weekOfMonth: null,
+      monthOfYear: null,
+      termination: { type: "never", until: null, count: null },
+      ...expected,
+    });
+  });
 
-  it("aligns monthly presets to their first valid occurrence", () => {
-    expect(alignDateKeyForPreset("2026-08-11", "firstOfMonth")).toBe(
-      "2026-09-01",
+  it("supports arbitrary weekly intervals and weekday sets", () => {
+    const input = createEventInputFromDraft(
+      draft({
+        repeatFrequency: "weekly",
+        interval: "4",
+        daysOfWeek: [5, 1, 3, 1],
+      }),
+      "UTC",
     );
-    expect(alignDateKeyForPreset("2026-08-11", "thirdFriday")).toBe(
-      "2026-08-21",
+
+    expect(input.recurrence).toMatchObject({
+      frequency: "weekly",
+      interval: 4,
+      daysOfWeek: [1, 3, 5],
+    });
+  });
+
+  it("supports yearly ordinal weekdays with a month selector", () => {
+    const input = createEventInputFromDraft(
+      draft({
+        repeatFrequency: "yearly",
+        interval: "2",
+        calendarPattern: "ordinalWeekday",
+        weekOfMonth: "-1",
+        ordinalWeekday: "1",
+        monthOfYear: "5",
+      }),
+      "UTC",
     );
-    expect(alignDateKeyForPreset("2026-08-22", "thirdFriday")).toBe(
-      "2026-09-18",
+
+    expect(input.recurrence).toMatchObject({
+      frequency: "yearly",
+      interval: 2,
+      daysOfWeek: [1],
+      weekOfMonth: -1,
+      monthOfYear: 5,
+    });
+  });
+
+  it("keeps the chosen start as the recurrence anchor", () => {
+    const input = createEventInputFromDraft(
+      draft({
+        date: "2026-08-11",
+        repeatFrequency: "monthly",
+        dayOfMonth: "1",
+      }),
+      "UTC",
     );
+
+    expect(input.startsAt.toISOString()).toBe("2026-08-11T09:00:00.000Z");
+    expect(input.recurrence?.dayOfMonth).toBe(1);
   });
 
   it("stores an all-day event with exclusive local date boundaries", () => {
@@ -91,7 +178,8 @@ describe("event creation normalization", () => {
   it("turns a through-date into an inclusive event-zone timestamp", () => {
     const input = createEventInputFromDraft(
       draft({
-        recurrencePreset: "everyOtherDay",
+        repeatFrequency: "daily",
+        interval: "2",
         terminationType: "onDate",
         untilDate: "2026-08-15",
       }),
@@ -103,7 +191,21 @@ describe("event creation normalization", () => {
     );
   });
 
-  it("rejects empty titles, backwards times, and invalid counts", () => {
+  it("summarizes expressive rules in plain language", () => {
+    expect(
+      recurrenceSummary(
+        draft({
+          repeatFrequency: "monthly",
+          interval: "2",
+          calendarPattern: "ordinalWeekday",
+          weekOfMonth: "1",
+          ordinalWeekday: "5",
+        }),
+      ),
+    ).toBe("EVERY 2 MONTHS ON THE FIRST FRIDAY");
+  });
+
+  it("rejects empty titles, backwards times, invalid intervals, and empty weekdays", () => {
     expect(() =>
       createEventInputFromDraft(draft({ title: "   " }), "UTC"),
     ).toThrow("ADD AN EVENT TITLE");
@@ -115,13 +217,15 @@ describe("event creation normalization", () => {
     ).toThrow("END TIME MUST BE AFTER START TIME");
     expect(() =>
       createEventInputFromDraft(
-        draft({
-          recurrencePreset: "everyThreeDays",
-          terminationType: "afterOccurrences",
-          occurrenceCount: "0",
-        }),
+        draft({ repeatFrequency: "daily", interval: "100" }),
         "UTC",
       ),
-    ).toThrow("OCCURRENCES MUST BE A WHOLE NUMBER");
+    ).toThrow("REPEAT INTERVAL IS NOT VALID");
+    expect(() =>
+      createEventInputFromDraft(
+        draft({ repeatFrequency: "weekly", daysOfWeek: [] }),
+        "UTC",
+      ),
+    ).toThrow("CHOOSE AT LEAST ONE WEEKDAY");
   });
 });
