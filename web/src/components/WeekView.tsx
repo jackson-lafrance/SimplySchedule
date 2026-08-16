@@ -18,7 +18,7 @@ export default function WeekView({
   onSelectDay: (date: Date) => void;
 }) {
   return (
-    <div className="week-grid" aria-label="Week calendar">
+    <div aria-label="Week calendar" className="week-grid" role="region">
       {days.map(({ day, events }) => (
         <section
           className={`week-day ${day.isToday ? "week-day-today" : ""}`}

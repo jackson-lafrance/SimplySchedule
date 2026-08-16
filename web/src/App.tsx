@@ -29,6 +29,19 @@ import { expandEventsInRange } from "@/domain/recurrence";
 type AppSection = "home" | "calendar" | "settings";
 type IconName = AppSection | "profile" | "add";
 
+const CALENDAR_VIEW_STORAGE_KEY = "simplySchedule:calendarView";
+
+function storedCalendarView(): CalendarView {
+  try {
+    const value = window.localStorage.getItem(CALENDAR_VIEW_STORAGE_KEY);
+    return value === "day" || value === "week" || value === "month"
+      ? value
+      : "week";
+  } catch {
+    return "week";
+  }
+}
+
 const monthFormatter = new Intl.DateTimeFormat("en-US", {
   month: "long",
   year: "numeric",
@@ -101,7 +114,17 @@ export default function App() {
   } = useSchedule();
   const [today] = useState(() => new Date());
   const [activeSection, setActiveSection] = useState<AppSection>("home");
-  const [calendarView, setCalendarView] = useState<CalendarView>("week");
+  const [calendarView, setCalendarViewState] = useState<CalendarView>(
+    storedCalendarView,
+  );
+  const setCalendarView = (view: CalendarView) => {
+    setCalendarViewState(view);
+    try {
+      window.localStorage.setItem(CALENDAR_VIEW_STORAGE_KEY, view);
+    } catch {
+      // The current session still works when browser storage is unavailable.
+    }
+  };
   const [selectedDate, setSelectedDate] = useState(
     () => new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12),
   );
@@ -111,7 +134,7 @@ export default function App() {
 
   const visibleRange = useMemo(() => {
     if (activeSection !== "calendar") {
-      return visibleRangeForDays(today, 7);
+      return visibleRangeForDays(today, 8);
     }
     if (calendarView === "day") {
       return visibleRangeForDay(selectedDate);
@@ -250,7 +273,11 @@ export default function App() {
                   <h1>Calendar</h1>
                   <p className="screen-summary">DAY, WEEK, OR MONTH. NOTHING EXTRA.</p>
                 </div>
-                <div className="view-switcher" aria-label="Calendar view">
+                <div
+                  aria-label="Calendar view"
+                  className="view-switcher"
+                  role="group"
+                >
                   {(["day", "week", "month"] as CalendarView[]).map((view) => (
                     <button
                       aria-pressed={calendarView === view}

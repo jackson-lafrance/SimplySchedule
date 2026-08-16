@@ -10,6 +10,7 @@ import {
   localDateKey,
   startOfWeek,
   visibleRangeForDay,
+  visibleRangeForDays,
   visibleRangeForMonth,
   visibleRangeForWeek,
 } from "@/domain/calendar";
@@ -61,11 +62,14 @@ describe("calendar month navigation", () => {
     expect(localDateKey(new Date(range.end.getTime() - 1))).toBe("2026-09-05");
   });
 
-  it("creates half-open day and Sunday-first week ranges", () => {
+  it("creates half-open Home, day, and Sunday-first week ranges", () => {
     const date = new Date(2026, 7, 11, 12);
+    const home = visibleRangeForDays(date, 8);
     const day = visibleRangeForDay(date);
     const week = visibleRangeForWeek(date);
 
+    expect(localDateKey(home.start)).toBe("2026-08-11");
+    expect(localDateKey(home.end)).toBe("2026-08-19");
     expect(localDateKey(day.start)).toBe("2026-08-11");
     expect(localDateKey(day.end)).toBe("2026-08-12");
     expect(localDateKey(startOfWeek(date))).toBe("2026-08-09");

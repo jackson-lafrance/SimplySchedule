@@ -138,6 +138,41 @@ describe("bounded recurrence expansion", () => {
     ]);
   });
 
+  it("supports last ordinal weekdays with arbitrary monthly intervals", () => {
+    const event = repeating(
+      rule({
+        frequency: "monthly",
+        interval: 2,
+        daysOfWeek: [5],
+        weekOfMonth: -1,
+      }),
+      { startsAt: new Date("2026-01-01T09:00:00.000Z") },
+    );
+
+    expect(
+      isoStarts(event, "2026-01-01T00:00:00.000Z", "2026-06-01T00:00:00.000Z"),
+    ).toEqual([
+      "2026-01-30T09:00:00.000Z",
+      "2026-03-27T09:00:00.000Z",
+      "2026-05-29T09:00:00.000Z",
+    ]);
+  });
+
+  it("finishes an impossible yearly selector without exhausting expansion", () => {
+    const event = repeating(
+      rule({
+        frequency: "yearly",
+        dayOfMonth: 31,
+        monthOfYear: 2,
+      }),
+      { startsAt: new Date("2026-02-01T09:00:00.000Z") },
+    );
+
+    expect(
+      isoStarts(event, "2026-01-01T00:00:00.000Z", "2030-01-01T00:00:00.000Z"),
+    ).toEqual([]);
+  });
+
   it.each([
     [2, [7, 9, 11, 13]],
     [3, [7, 10, 13]],

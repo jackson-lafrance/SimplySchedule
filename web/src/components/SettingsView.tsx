@@ -31,7 +31,7 @@ export default function SettingsView({
         <label className="setting-card">
           <span>
             <strong>Default calendar view</strong>
-            <small>Used when you open Calendar.</small>
+            <small>Saved in this browser for the next time you open Calendar.</small>
           </span>
           <select
             aria-label="Default calendar view"

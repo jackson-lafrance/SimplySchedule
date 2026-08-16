@@ -41,7 +41,7 @@ Every event has exactly these fields:
 - All-day starts/ends are interpreted in the event's IANA `timeZone`; `endsAt` is exclusive. A one-day all-day event starts at local midnight and ends at the next local midnight.
 - A timed event with `endsAt: null` is a point event.
 - A timed event intersects a day when `startsAt < dayEnd` and `endsAt > dayStart`; a point event belongs to the day containing `startsAt`.
-- A repeating series anchor is never rendered unless it matches the rule. The web client expands occurrences only for the active Home/day/week/month range; calculated occurrences are never persisted.
+- A repeating series anchor is never rendered unless it matches the rule. The web client expands occurrences only for the active range (Home covers today plus the next seven days); calculated occurrences are never persisted.
 
 ## Recurrence map, version 1
 

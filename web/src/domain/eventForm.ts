@@ -1,10 +1,14 @@
 import type {
+  CalendarEvent,
   CreateEventInput,
   RecurrenceFrequency,
   RecurrenceRule,
   RecurrenceTerminationType,
 } from "@/domain/events";
-import { zonedDateTimeToDate } from "@/domain/recurrence";
+import {
+  expandEventInRange,
+  zonedDateTimeToDate,
+} from "@/domain/recurrence";
 
 export type RepeatFrequency = "none" | RecurrenceFrequency;
 export type CalendarPattern = "dayOfMonth" | "ordinalWeekday";
@@ -48,6 +52,20 @@ const ORDINAL_NAMES: Record<number, string> = {
   5: "fifth",
   [-1]: "last",
 };
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
 
 function parseDateKey(value: string) {
   const match = DATE_PATTERN.exec(value);
@@ -224,6 +242,57 @@ function recurrenceRule(
   return common;
 }
 
+function previewRangeEnd(input: CreateEventInput & { kind: "repeating" }) {
+  const end = new Date(input.startsAt);
+  const { frequency, interval, termination } = input.recurrence;
+
+  if (frequency === "hourly") {
+    end.setTime(end.getTime() + interval * 8 * 60 * 60 * 1_000);
+  } else if (frequency === "daily") {
+    end.setUTCDate(end.getUTCDate() + interval * 8);
+  } else if (frequency === "weekly") {
+    end.setUTCDate(end.getUTCDate() + interval * 8 * 7);
+  } else if (frequency === "monthly") {
+    end.setUTCMonth(end.getUTCMonth() + interval * 24);
+  } else {
+    // The Gregorian weekday/leap-year pattern repeats every 400 years. Looking
+    // through 401 recurrence periods proves whether a yearly selector can ever
+    // produce an occurrence for this anchor and interval.
+    end.setUTCFullYear(end.getUTCFullYear() + interval * 401);
+  }
+
+  if (
+    termination.type === "onDate" &&
+    termination.until &&
+    termination.until < end
+  ) {
+    return new Date(termination.until.getTime() + 1);
+  }
+  return end;
+}
+
+export function previewEventOccurrences(
+  input: CreateEventInput,
+  maximum = 5,
+) {
+  if (input.kind === "single") {
+    return [input.startsAt];
+  }
+
+  const event: CalendarEvent = {
+    ...input,
+    id: "event-preview",
+    createdAt: input.startsAt,
+    updatedAt: input.startsAt,
+  };
+
+  return expandEventInRange(
+    event,
+    { start: input.startsAt, end: previewRangeEnd(input) },
+    maximum,
+  ).map((occurrence) => occurrence.startsAt);
+}
+
 export function createEventInputFromDraft(
   draft: EventDraft,
   timeZone: string,
@@ -272,10 +341,19 @@ export function createEventInputFromDraft(
     allDay: draft.allDay,
     timeZone,
   };
-
-  return recurrence
+  const input: CreateEventInput = recurrence
     ? { ...base, kind: "repeating", recurrence }
     : { ...base, kind: "single", recurrence: null };
+
+  if (input.kind === "repeating" && previewEventOccurrences(input, 1).length === 0) {
+    throw new Error(
+      input.recurrence.termination.type === "onDate"
+        ? "THE REPEAT END DATE MUST INCLUDE THE FIRST MATCHING OCCURRENCE."
+        : "THE REPEAT RULE DOES NOT PRODUCE AN OCCURRENCE AFTER THE START ANCHOR.",
+    );
+  }
+
+  return input;
 }
 
 function unitName(frequency: RecurrenceFrequency, plural: boolean) {
@@ -300,6 +378,13 @@ export function recurrenceSummary(draft: EventDraft) {
       .join(", ")}`;
   }
 
+  if (draft.repeatFrequency === "yearly") {
+    const month = MONTH_NAMES[Number(draft.monthOfYear) - 1];
+    if (month) {
+      summary += ` IN ${month.toUpperCase()}`;
+    }
+  }
+
   if (
     (draft.repeatFrequency === "monthly" ||
       draft.repeatFrequency === "yearly") &&
@@ -318,6 +403,15 @@ export function recurrenceSummary(draft: EventDraft) {
     const ordinal = ORDINAL_NAMES[Number(draft.weekOfMonth)] ?? "selected";
     const weekday = WEEKDAY_NAMES[Number(draft.ordinalWeekday)] ?? "weekday";
     summary += ` ON THE ${ordinal.toUpperCase()} ${weekday.toUpperCase()}`;
+  }
+
+  if (draft.terminationType === "onDate" && draft.untilDate) {
+    summary += `, THROUGH ${draft.untilDate}`;
+  } else if (
+    draft.terminationType === "afterOccurrences" &&
+    Number(draft.occurrenceCount) > 0
+  ) {
+    summary += `, FOR ${draft.occurrenceCount} OCCURRENCES`;
   }
 
   return summary;

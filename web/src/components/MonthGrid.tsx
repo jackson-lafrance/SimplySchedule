@@ -30,7 +30,11 @@ export default function MonthGrid({
           <span key={label}>{label}</span>
         ))}
       </div>
-      <div className="month-grid" role="grid" aria-label="Month calendar">
+      <div
+        aria-label="Month calendar"
+        className="month-grid"
+        role="region"
+      >
         {days.map((day) => {
           const dayEvents = eventsForDate(events, day.date);
           const visibleEvents = dayEvents.slice(0, 3);
@@ -50,7 +54,6 @@ export default function MonthGrid({
               }`}
               key={day.key}
               onClick={() => onSelectDay(day)}
-              role="gridcell"
               type="button"
             >
               <span className="day-number">{day.dayNumber}</span>

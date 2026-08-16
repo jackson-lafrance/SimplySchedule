@@ -8,7 +8,7 @@
 
   --canvas: #ffffff;
   --ink: #000000;
-  --muted: #8e8e93;
+  --muted: #636366;
   --divider: #d1d1d6;
   --pale-border: #e5e5ea;
   --surface-muted: #f2f2f7;
@@ -28,6 +28,7 @@ html {
 body {
   min-width: 320px;
   min-height: 100vh;
+  min-height: 100dvh;
   margin: 0;
   background: var(--canvas);
 }
@@ -73,6 +74,7 @@ h3 {
 
 .app-shell {
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--canvas);
 }
 
@@ -218,7 +220,7 @@ h3 {
   text-transform: uppercase;
 }
 
-.section-tabs button:hover {
+.section-tabs button:not(.tab-active):hover {
   background: var(--surface-muted);
   color: var(--ink);
 }
@@ -506,7 +508,7 @@ h3 {
   border-right: 0;
 }
 
-.view-switcher button:hover {
+.view-switcher button:not(.view-active):hover {
   background: var(--surface-muted);
 }
 
@@ -906,7 +908,7 @@ h3 {
 
 .settings-version {
   margin: 42px 0 0;
-  color: var(--pale-border);
+  color: var(--muted);
   font-size: 11px;
   font-weight: 700;
   text-align: center;
@@ -955,9 +957,11 @@ h3 {
 
 .create-event-sheet,
 .profile-panel {
+  position: relative;
   display: flex;
   width: min(620px, 100%);
   height: 100%;
+  height: 100dvh;
   flex-direction: column;
   border-left: 2px solid var(--ink);
   background: var(--canvas);
@@ -1037,7 +1041,7 @@ h3 {
   background: var(--canvas);
   padding: 10px 12px;
   font-size: 13px;
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .title-field input {
@@ -1175,6 +1179,40 @@ h3 {
   font-weight: 700;
 }
 
+.occurrence-preview {
+  margin-top: 16px;
+  border-top: 1px solid var(--divider);
+  padding-top: 14px;
+}
+
+.occurrence-preview > p {
+  margin: 0 0 8px;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+
+.occurrence-preview ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.occurrence-preview li {
+  border: 1px solid var(--divider);
+  border-radius: 6px;
+  background: var(--surface-muted);
+  padding: 6px 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
 .disclosure-button {
   width: 100%;
   min-height: 46px;
@@ -1235,6 +1273,62 @@ h3 {
   background: var(--canvas);
 }
 
+.discard-overlay {
+  position: absolute;
+  z-index: 5;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 20px;
+}
+
+.discard-dialog {
+  width: min(380px, 100%);
+  border: 2px solid var(--ink);
+  border-radius: 12px;
+  background: var(--canvas);
+  padding: 22px;
+}
+
+.discard-dialog h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  text-transform: uppercase;
+}
+
+.discard-dialog > p:not(.eyebrow) {
+  margin: 10px 0 20px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.discard-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.destructive-button {
+  min-height: 48px;
+  border: 2px solid var(--destructive);
+  border-radius: 8px;
+  background: var(--canvas);
+  color: var(--destructive);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+
+.destructive-button:hover {
+  background: var(--destructive);
+  color: var(--canvas);
+}
+
 .profile-panel {
   width: min(460px, 100%);
 }
@@ -1253,6 +1347,14 @@ h3 {
   font-size: 20px;
   font-weight: 900;
   letter-spacing: 0.5px;
+}
+
+.profile-sync-state {
+  margin-top: 7px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.7px;
 }
 
 .profile-content > p:not(.eyebrow) {
@@ -1525,7 +1627,7 @@ h3 {
 
   .create-event-sheet,
   .profile-panel {
-    height: min(92%, 840px);
+    height: min(92dvh, 840px);
     align-self: flex-end;
     border-top: 2px solid var(--ink);
     border-left: 0;
@@ -1542,6 +1644,10 @@ h3 {
 
   .repeat-frequency-row {
     align-items: stretch;
+  }
+
+  .form-actions {
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
   }
 
   .form-actions button {

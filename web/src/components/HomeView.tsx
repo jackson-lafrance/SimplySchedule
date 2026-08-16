@@ -21,7 +21,7 @@ export default function HomeView({
   today: Date;
 }) {
   const todayEvents = eventsForDate(occurrences, today);
-  const upcoming = getAgendaForDays(today, 7, occurrences).filter(
+  const upcoming = getAgendaForDays(today, 8, occurrences).filter(
     ({ day }) => !day.isToday,
   );
 

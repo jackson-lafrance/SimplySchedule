@@ -1,6 +1,6 @@
 # Simply Schedule web calendar and event workflows
 
-The web client is a Vite/React/TypeScript schedule in Simply Lift's restrained visual language. Its information architecture is deliberately small:
+The web client is a Vite/React/TypeScript schedule in Simply Lift's restrained visual language. The web adaptation keeps the same monochrome hierarchy while using a darker muted neutral where the reference app's small gray text would not meet WCAG contrast. Its information architecture is deliberately small:
 
 - **Home** — today's agenda and the next seven populated days;
 - **Calendar** — uncluttered day, week, and month views;
@@ -71,7 +71,8 @@ npm run typecheck
 npm run lint
 npm run build
 
-# Installs Chromium once on a new machine, then runs browser creation/expansion.
+# Installs Chromium once on a new machine, then runs desktop/mobile flows,
+# responsive checks, keyboard dialog coverage, and automated WCAG scans.
 npx playwright install chromium
 npm run test:e2e
 ```
@@ -92,4 +93,4 @@ Set the `VITE_FIREBASE_*` values above and `FIREBASE_E2E=true` while running Pla
 
 ## Semantics
 
-Calendar ranges are half-open: Home uses seven days, day uses one, week uses seven from Sunday, and month uses the full six-week grid. Daily/weekly/monthly/yearly rules preserve the event timezone's wall clock across offset changes; hourly rules use elapsed-hour intervals. `startsAt` is the recurrence anchor/lower bound, selector-based rules begin at their first match on or after it, `onDate` includes the selected local day, and `afterOccurrences` includes the first matching occurrence. Expansion emits at most 2,000 occurrences per projection and keeps each calculated occurrence out of Firestore.
+Calendar ranges are half-open: Home covers today plus the next seven days, day uses one day, week uses seven from Sunday, and month uses the full six-week grid. Daily/weekly/monthly/yearly rules preserve the event timezone's wall clock across offset changes; hourly rules use elapsed-hour intervals. `startsAt` is the recurrence anchor/lower bound, selector-based rules begin at their first match on or after it, `onDate` includes the selected local day, and `afterOccurrences` includes the first matching occurrence. Expansion emits at most 2,000 occurrences per projection and keeps each calculated occurrence out of Firestore.

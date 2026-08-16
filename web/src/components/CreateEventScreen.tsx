@@ -1,7 +1,9 @@
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 
+import { useModalDialog } from "@/components/useModalDialog";
 import {
   createEventInputFromDraft,
+  previewEventOccurrences,
   recurrenceSummary,
   weekdayForDateKey,
   type CalendarPattern,
@@ -53,6 +55,61 @@ function initialDraft(date: string): EventDraft {
   };
 }
 
+function DiscardChangesDialog({
+  onDiscard,
+  onKeepEditing,
+}: {
+  onDiscard: () => void;
+  onKeepEditing: () => void;
+}) {
+  const dialogRef = useModalDialog(onKeepEditing);
+
+  return (
+    <div
+      className="discard-overlay"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          onKeepEditing();
+        }
+      }}
+      role="presentation"
+    >
+      <section
+        aria-describedby="discard-description"
+        aria-labelledby="discard-title"
+        aria-modal="true"
+        className="discard-dialog"
+        ref={dialogRef}
+        role="dialog"
+        tabIndex={-1}
+      >
+        <p className="eyebrow">Unsaved event</p>
+        <h2 id="discard-title">Discard changes?</h2>
+        <p id="discard-description">
+          Your event details have not been saved.
+        </p>
+        <div className="discard-actions">
+          <button
+            className="primary-button"
+            data-initial-focus
+            onClick={onKeepEditing}
+            type="button"
+          >
+            Keep editing
+          </button>
+          <button
+            className="destructive-button"
+            onClick={onDiscard}
+            type="button"
+          >
+            Discard
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 export default function CreateEventScreen({
   initialDate,
   onCancel,
@@ -62,11 +119,25 @@ export default function CreateEventScreen({
   onCancel: () => void;
   onSave: (event: CreateEventInput) => Promise<void>;
 }) {
-  const [draft, setDraft] = useState(() => initialDraft(initialDate));
+  const [initialValues] = useState(() => initialDraft(initialDate));
+  const [draft, setDraft] = useState(initialValues);
   const [showMore, setShowMore] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [discarding, setDiscarding] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const timeZone = browserTimeZone();
+  const dirty = JSON.stringify(draft) !== JSON.stringify(initialValues);
+  const requestCancel = () => {
+    if (saving) {
+      return;
+    }
+    if (dirty) {
+      setDiscarding(true);
+    } else {
+      onCancel();
+    }
+  };
+  const dialogRef = useModalDialog(requestCancel);
 
   const update = <Field extends keyof EventDraft>(
     field: Field,
@@ -74,11 +145,34 @@ export default function CreateEventScreen({
   ) => setDraft((current) => ({ ...current, [field]: value }));
 
   const selectDate = (date: string) => {
-    setDraft((current) => ({
-      ...current,
-      date,
-      untilDate: current.untilDate < date ? date : current.untilDate,
-    }));
+    setDraft((current) => {
+      const next = {
+        ...current,
+        date,
+        untilDate: current.untilDate < date ? date : current.untilDate,
+      };
+
+      // Keep untouched defaults aligned with the anchor. Once recurrence is
+      // enabled, selectors stay independent so users can intentionally anchor
+      // before the first matching weekday/date.
+      if (current.repeatFrequency === "none") {
+        const [, month, day] = date.split("-").map(Number);
+        try {
+          const weekday = weekdayForDateKey(date);
+          return {
+            ...next,
+            daysOfWeek: [weekday],
+            dayOfMonth: String(day),
+            ordinalWeekday: String(weekday),
+            monthOfYear: String(month),
+          };
+        } catch {
+          // Native date inputs can briefly emit an empty value while editing.
+        }
+      }
+
+      return next;
+    });
   };
 
   const toggleWeekday = (weekday: number) => {
@@ -112,14 +206,50 @@ export default function CreateEventScreen({
   const usesCalendarPattern =
     draft.repeatFrequency === "monthly" ||
     draft.repeatFrequency === "yearly";
+  const previewDates = useMemo(() => {
+    if (!repeats) {
+      return [];
+    }
+    try {
+      const input = createEventInputFromDraft(
+        { ...draft, title: draft.title.trim() || "Event preview" },
+        timeZone,
+      );
+      return previewEventOccurrences(input);
+    } catch {
+      return [];
+    }
+  }, [draft, repeats, timeZone]);
+  const previewFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        hour: draft.allDay ? undefined : "numeric",
+        minute: draft.allDay ? undefined : "2-digit",
+        timeZone,
+      }),
+    [draft.allDay, timeZone],
+  );
 
   return (
-    <div className="sheet-overlay" role="presentation">
+    <div
+      className="sheet-overlay"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          requestCancel();
+        }
+      }}
+      role="presentation"
+    >
       <section
         aria-labelledby="create-event-title"
         aria-modal="true"
         className="create-event-sheet"
+        ref={dialogRef}
         role="dialog"
+        tabIndex={-1}
       >
         <div className="sheet-header">
           <div>
@@ -130,7 +260,7 @@ export default function CreateEventScreen({
             aria-label="Close event editor"
             className="plain-icon-button"
             disabled={saving}
-            onClick={onCancel}
+            onClick={requestCancel}
             type="button"
           >
             ×
@@ -142,7 +272,7 @@ export default function CreateEventScreen({
             <label className="form-field form-field-wide title-field">
               <span>Title</span>
               <input
-                autoFocus
+                data-initial-focus
                 maxLength={200}
                 onChange={(event) => update("title", event.target.value)}
                 placeholder="WHAT IS HAPPENING?"
@@ -358,6 +488,20 @@ export default function CreateEventScreen({
                     <strong>{recurrenceSummary(draft)}</strong>
                     <small>Anchored {draft.date} · {timeZone}</small>
                   </div>
+                  {previewDates.length > 0 ? (
+                    <div className="occurrence-preview">
+                      <p>Next occurrences</p>
+                      <ol aria-label="Next recurrence dates">
+                        {previewDates.map((date) => (
+                          <li key={date.toISOString()}>
+                            <time dateTime={date.toISOString()}>
+                              {previewFormatter.format(date)}
+                            </time>
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  ) : null}
                   <div className="termination-fields">
                     <label className="form-field">
                       <span>Ends</span>
@@ -447,7 +591,7 @@ export default function CreateEventScreen({
             <button
               className="outline-button"
               disabled={saving}
-              onClick={onCancel}
+              onClick={requestCancel}
               type="button"
             >
               Cancel
@@ -457,6 +601,12 @@ export default function CreateEventScreen({
             </button>
           </div>
         </form>
+        {discarding ? (
+          <DiscardChangesDialog
+            onDiscard={onCancel}
+            onKeepEditing={() => setDiscarding(false)}
+          />
+        ) : null}
       </section>
     </div>
   );
