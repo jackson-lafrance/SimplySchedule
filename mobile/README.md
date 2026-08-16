@@ -4,10 +4,10 @@ The mobile app is an Expo/React Native agenda, task, and calendar client designe
 
 ## Product structure
 
-- **Home** — only a horizontally scrolling weekday strip and the selected day's minimal task/event rows.
+- **Home** — the current week as vertically scrolling date sections, positioned on today when opened.
 - **Calendar** — restrained day, week, and month selection followed by the selected day's schedule.
 - **Settings** — only week start, default calendar view, and 12/24-hour display.
-- **Add Task or Event** — the single full-width primary action, matching SimplyLift's Start Workout placement and behavior.
+- **+ schedule** — the single full-width primary action, matching SimplyLift's Start Workout placement and behavior.
 
 Task and event rows use distinct semantic colors and expose only a name plus essential timing; tapping a row opens its details card. Quick task creation needs a title and due time. Quick event creation needs a title, start anchor, and time. Notes, all-day behavior, and recurrence stay behind **More Options**.
 

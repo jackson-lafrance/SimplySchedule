@@ -38,7 +38,6 @@ export default function BottomShelf({
         ]}
         testID="add-item-button"
       >
-        <MaterialIcons name="add" size={24} color={colors.inverse} />
         <Text
           adjustsFontSizeToFit
           maxFontSizeMultiplier={1.3}
@@ -46,7 +45,7 @@ export default function BottomShelf({
           numberOfLines={1}
           style={styles.addText}
         >
-          ADD TASK OR EVENT
+          + schedule
         </Text>
       </Pressable>
 
@@ -117,7 +116,6 @@ const styles = StyleSheet.create({
     color: colors.inverse,
     fontSize: 16,
     fontWeight: "900",
-    textTransform: "uppercase",
     letterSpacing: 1,
   },
   tabBar: {
