@@ -154,6 +154,81 @@ for (const [interval, days] of [
   });
 }
 
+test("keeps recurring all-day boundaries at local midnight through DST", () => {
+  const timeZone = "America/Los_Angeles";
+  const startsAt = zonedDateTimeToDate(
+    {
+      year: 2026,
+      month: 3,
+      day: 7,
+      hour: 0,
+      minute: 0,
+      second: 0,
+      millisecond: 0,
+    },
+    timeZone,
+  );
+  const endsAt = zonedDateTimeToDate(
+    {
+      year: 2026,
+      month: 3,
+      day: 8,
+      hour: 0,
+      minute: 0,
+      second: 0,
+      millisecond: 0,
+    },
+    timeZone,
+  );
+  const event = repeating(rule({ frequency: "daily" }), {
+    startsAt,
+    endsAt,
+    allDay: true,
+    timeZone,
+  });
+  const occurrences = expandEventInRange(event, {
+    start: startsAt,
+    end: zonedDateTimeToDate(
+      {
+        year: 2026,
+        month: 3,
+        day: 10,
+        hour: 0,
+        minute: 0,
+        second: 0,
+        millisecond: 0,
+      },
+      timeZone,
+    ),
+  });
+  const dstOccurrence = occurrences[1];
+
+  assert.deepEqual(
+    zonedDateTimeParts(dstOccurrence.startsAt, timeZone),
+    {
+      year: 2026,
+      month: 3,
+      day: 8,
+      hour: 0,
+      minute: 0,
+      second: 0,
+      millisecond: 0,
+    },
+  );
+  assert.equal(
+    zonedDateTimeParts(dstOccurrence.endsAt!, timeZone).hour,
+    0,
+  );
+  assert.equal(
+    zonedDateTimeParts(dstOccurrence.endsAt!, timeZone).day,
+    9,
+  );
+  assert.equal(
+    dstOccurrence.endsAt!.getTime() - dstOccurrence.startsAt.getTime(),
+    23 * 60 * 60 * 1_000,
+  );
+});
+
 test("expands multi-weekday rules at arbitrary week intervals", () => {
   const event = repeating(
     rule({
@@ -245,6 +320,42 @@ test("honors occurrence count and inclusive through-date termination", () => {
       "2026-01-01T09:00:00.000Z",
       "2026-01-03T09:00:00.000Z",
       "2026-01-05T09:00:00.000Z",
+    ],
+  );
+});
+
+test("keeps leap-day yearly rules on valid years only", () => {
+  const event = repeating(
+    rule({
+      frequency: "yearly",
+      monthOfYear: 2,
+      dayOfMonth: 29,
+    }),
+    { startsAt: new Date("2024-02-29T09:00:00.000Z") },
+  );
+
+  assert.deepEqual(
+    isoStarts(event, "2025-01-01T00:00:00.000Z", "2029-01-01T00:00:00.000Z"),
+    ["2028-02-29T09:00:00.000Z"],
+  );
+});
+
+test("expands last-weekday monthly selectors", () => {
+  const event = repeating(
+    rule({
+      frequency: "monthly",
+      daysOfWeek: [5],
+      weekOfMonth: -1,
+    }),
+    { startsAt: new Date("2026-01-30T09:00:00.000Z") },
+  );
+
+  assert.deepEqual(
+    isoStarts(event, "2026-01-01T00:00:00.000Z", "2026-04-01T00:00:00.000Z"),
+    [
+      "2026-01-30T09:00:00.000Z",
+      "2026-02-27T09:00:00.000Z",
+      "2026-03-27T09:00:00.000Z",
     ],
   );
 });

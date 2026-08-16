@@ -35,6 +35,20 @@ export type TimeParts = { hour: number; minute: number };
 const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 const TIME_PATTERN = /^(\d{2}):(\d{2})$/;
 const WEEKDAY_NAMES = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+const MONTH_NAMES = [
+  "JAN",
+  "FEB",
+  "MAR",
+  "APR",
+  "MAY",
+  "JUN",
+  "JUL",
+  "AUG",
+  "SEP",
+  "OCT",
+  "NOV",
+  "DEC",
+];
 const ORDINAL_NAMES = new Map<number, string>([
   [1, "FIRST"],
   [2, "SECOND"],
@@ -405,11 +419,16 @@ export function recurrenceDraftSummary(draft: EventDraft) {
   }
   if (draft.frequency === "monthly" || draft.frequency === "yearly") {
     const selector = draft.calendarSelectorMode === "dayOfMonth"
-      ? `DAY ${draft.dayOfMonth}`
+      ? draft.dayOfMonth === "-1"
+        ? "LAST DAY"
+        : `DAY ${draft.dayOfMonth}`
       : `${ORDINAL_NAMES.get(draft.weekOfMonth) ?? "FIRST"} ${
           WEEKDAY_NAMES[draft.ordinalWeekday]
         }`;
-    return `${every} · ${selector}`;
+    const month = draft.frequency === "yearly"
+      ? `${MONTH_NAMES[Number(draft.monthOfYear) - 1] ?? "CHOOSE MONTH"} · `
+      : "";
+    return `${every} · ${month}${selector}`;
   }
   return every;
 }

@@ -39,7 +39,15 @@ export default function BottomShelf({
         testID="add-item-button"
       >
         <MaterialIcons name="add" size={24} color={colors.inverse} />
-        <Text style={styles.addText}>ADD TASK OR EVENT</Text>
+        <Text
+          adjustsFontSizeToFit
+          maxFontSizeMultiplier={1.3}
+          minimumFontScale={0.75}
+          numberOfLines={1}
+          style={styles.addText}
+        >
+          ADD TASK OR EVENT
+        </Text>
       </Pressable>
 
       <View accessibilityRole="tablist" style={styles.tabBar}>
@@ -63,6 +71,10 @@ export default function BottomShelf({
                 color={active ? colors.ink : colors.muted}
               />
               <Text
+                adjustsFontSizeToFit
+                maxFontSizeMultiplier={1.3}
+                minimumFontScale={0.8}
+                numberOfLines={1}
                 style={[
                   styles.tabLabel,
                   { color: active ? colors.ink : colors.muted },

@@ -40,7 +40,11 @@ export default function MonthGrid({
     <View>
       <View style={styles.weekdays}>
         {weekdays.map((day, index) => (
-          <Text key={`${day}-${index}`} style={styles.weekday}>
+          <Text
+            key={`${day}-${index}`}
+            maxFontSizeMultiplier={1.3}
+            style={styles.weekday}
+          >
             {day}
           </Text>
         ))}
@@ -66,6 +70,7 @@ export default function MonthGrid({
               ]}
             >
               <Text
+                maxFontSizeMultiplier={1.3}
                 style={[
                   styles.dayNumber,
                   !day.isCurrentMonth && styles.outside,

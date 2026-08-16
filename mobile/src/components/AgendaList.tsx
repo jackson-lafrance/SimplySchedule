@@ -1,7 +1,9 @@
 import { useState } from "react";
 import {
+  ActivityIndicator,
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -47,6 +49,8 @@ export default function AgendaList({
   onCompleteTask: (taskId: string) => Promise<void>;
 }) {
   const [selected, setSelected] = useState<SelectedItem | null>(null);
+  const [completingTask, setCompletingTask] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const items: SelectedItem[] = dates
     .flatMap((date) => [
       ...tasksForDate(tasks, date).map(
@@ -63,6 +67,30 @@ export default function AgendaList({
         right.type === "task" ? right.item.dueAt : right.item.startsAt;
       return (leftDate?.getTime() ?? 0) - (rightDate?.getTime() ?? 0);
     });
+
+  const openDetails = (item: SelectedItem) => {
+    setActionError(null);
+    setSelected(item);
+  };
+  const closeDetails = () => {
+    if (completingTask) return;
+    setActionError(null);
+    setSelected(null);
+  };
+  const completeSelectedTask = async () => {
+    if (!selected || selected.type !== "task") return;
+    setActionError(null);
+    setCompletingTask(true);
+    try {
+      await onCompleteTask(selected.item.id);
+      setSelected(null);
+    } catch (error) {
+      console.error("Could not complete task", error);
+      setActionError("THE TASK COULD NOT BE COMPLETED. TRY AGAIN.");
+    } finally {
+      setCompletingTask(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -83,10 +111,10 @@ export default function AgendaList({
           return (
             <Pressable
               accessibilityHint="Opens item details"
-              accessibilityLabel={`${item.title}, ${timing}`}
+              accessibilityLabel={`${isTask ? "Task" : "Event"}, ${item.title}, ${timing}`}
               accessibilityRole="button"
               key={`${selectedItem.type}-${item.id}`}
-              onPress={() => setSelected(selectedItem)}
+              onPress={() => openDetails(selectedItem)}
               style={({ pressed }) => [
                 styles.item,
                 isTask ? styles.taskItem : styles.eventItem,
@@ -111,72 +139,91 @@ export default function AgendaList({
 
       <Modal
         animationType="fade"
-        onRequestClose={() => setSelected(null)}
+        onRequestClose={closeDetails}
         transparent
         visible={selected !== null}
       >
         <View style={styles.overlay}>
           {selected ? (
-            <View style={styles.detailCard}>
-              <Text
-                style={[
-                  styles.detailType,
-                  selected.type === "task" ? styles.taskText : styles.eventText,
-                ]}
+            <View accessibilityViewIsModal style={styles.detailCard}>
+              <ScrollView
+                contentContainerStyle={styles.detailContent}
+                showsVerticalScrollIndicator={false}
+                style={styles.detailScroll}
               >
-                {selected.type === "task" ? "TASK" : "EVENT"}
-              </Text>
-              <Text numberOfLines={1} adjustsFontSizeToFit style={styles.detailTitle}>
-                {selected.item.title}
-              </Text>
-              <Text style={styles.detailTiming}>
-                {selected.type === "task"
-                  ? selected.item.dueAt
-                    ? `DUE ${selected.item.dueAt.toLocaleDateString("en-US", {
+                <Text
+                  style={[
+                    styles.detailType,
+                    selected.type === "task"
+                      ? styles.taskText
+                      : styles.eventText,
+                  ]}
+                >
+                  {selected.type === "task" ? "TASK" : "EVENT"}
+                </Text>
+                <Text numberOfLines={3} style={styles.detailTitle}>
+                  {selected.item.title}
+                </Text>
+                <Text style={styles.detailTiming}>
+                  {selected.type === "task"
+                    ? selected.item.dueAt
+                      ? `DUE ${selected.item.dueAt.toLocaleDateString("en-US", {
+                          weekday: "long",
+                          month: "long",
+                          day: "numeric",
+                        })} · ${timeLabel(selected.item.dueAt, timeDisplay)}`
+                      : "NO DUE DATE"
+                    : `${selected.item.startsAt.toLocaleDateString("en-US", {
                         weekday: "long",
                         month: "long",
                         day: "numeric",
-                      })} · ${timeLabel(selected.item.dueAt, timeDisplay)}`
-                    : "NO DUE DATE"
-                  : `${selected.item.startsAt.toLocaleDateString("en-US", {
-                      weekday: "long",
-                      month: "long",
-                      day: "numeric",
-                    })} · ${eventTime(selected.item, timeDisplay)}`}
-              </Text>
-              {selected.item.notes ? (
-                <Text style={styles.detailNotes}>{selected.item.notes}</Text>
-              ) : null}
-              {selected.type === "event" && selected.item.isRepeating ? (
-                <Text style={styles.detailMeta}>
-                  REPEATING · {selected.item.timeZone.toUpperCase()}
+                      })} · ${eventTime(selected.item, timeDisplay)}`}
+                </Text>
+                {selected.item.notes ? (
+                  <Text style={styles.detailNotes}>{selected.item.notes}</Text>
+                ) : null}
+                {selected.type === "event" && selected.item.isRepeating ? (
+                  <Text style={styles.detailMeta}>
+                    REPEATING · {selected.item.timeZone.toUpperCase()}
+                  </Text>
+                ) : null}
+              </ScrollView>
+
+              {actionError ? (
+                <Text accessibilityRole="alert" style={styles.actionError}>
+                  {actionError}
                 </Text>
               ) : null}
-
               {selected.type === "task" ? (
                 <Pressable
                   accessibilityRole="button"
-                  onPress={() => {
-                    void onCompleteTask(selected.item.id)
-                      .then(() => setSelected(null))
-                      .catch((error) =>
-                        console.error("Could not complete task", error),
-                      );
+                  accessibilityState={{
+                    busy: completingTask,
+                    disabled: completingTask,
                   }}
+                  disabled={completingTask}
+                  onPress={() => void completeSelectedTask()}
                   style={({ pressed }) => [
                     styles.primaryButton,
                     pressed && styles.primaryPressed,
+                    completingTask && styles.disabled,
                   ]}
                 >
-                  <Text style={styles.primaryText}>MARK COMPLETE</Text>
+                  {completingTask ? (
+                    <ActivityIndicator color={colors.inverse} />
+                  ) : (
+                    <Text style={styles.primaryText}>MARK COMPLETE</Text>
+                  )}
                 </Pressable>
               ) : null}
               <Pressable
                 accessibilityRole="button"
-                onPress={() => setSelected(null)}
+                disabled={completingTask}
+                onPress={closeDetails}
                 style={({ pressed }) => [
                   styles.doneButton,
                   pressed && styles.pressed,
+                  completingTask && styles.disabled,
                 ]}
               >
                 <Text style={styles.doneText}>DONE</Text>
@@ -215,6 +262,9 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.6,
   },
+  disabled: {
+    opacity: 0.5,
+  },
   timing: {
     ...typography.label,
     marginBottom: spacing.xxs,
@@ -247,11 +297,18 @@ const styles = StyleSheet.create({
   },
   detailCard: {
     width: "100%",
+    maxHeight: "85%",
     padding: spacing.xl,
     borderWidth: 2,
     borderColor: colors.ink,
     borderRadius: 12,
     backgroundColor: colors.background,
+  },
+  detailScroll: {
+    flexShrink: 1,
+  },
+  detailContent: {
+    paddingBottom: spacing.xs,
   },
   detailType: {
     ...typography.label,
@@ -281,6 +338,16 @@ const styles = StyleSheet.create({
     color: colors.muted,
     marginTop: spacing.md,
   },
+  actionError: {
+    borderWidth: 2,
+    borderColor: colors.destructive,
+    borderRadius: radii.control,
+    padding: spacing.sm,
+    color: colors.destructive,
+    fontSize: 12,
+    fontWeight: "800",
+    marginTop: spacing.sm,
+  },
   primaryButton: {
     minHeight: 50,
     borderWidth: 2,
@@ -289,7 +356,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.ink,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: spacing.xl,
+    marginTop: spacing.md,
   },
   primaryPressed: {
     backgroundColor: colors.success,

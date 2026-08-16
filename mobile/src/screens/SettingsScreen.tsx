@@ -2,17 +2,12 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 import SegmentedControl from "@/components/SegmentedControl";
 import { usePreferences } from "@/context/PreferencesContext";
-import { colors, radii, spacing, typography } from "@/theme";
+import { colors, radii, spacing } from "@/theme";
 
 export default function SettingsScreen() {
   const { preferences, setPreference } = usePreferences();
   return (
     <ScrollView contentContainerStyle={styles.content}>
-      <View>
-        <Text style={styles.eyebrow}>SETTINGS</Text>
-        <Text style={styles.title}>MAKE IT YOURS</Text>
-      </View>
-
       <View style={styles.card}>
         <Text style={styles.cardTitle}>WEEK START</Text>
         <SegmentedControl
@@ -63,19 +58,6 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     paddingBottom: spacing.xxl,
     gap: spacing.sm,
-  },
-  eyebrow: {
-    ...typography.label,
-    color: colors.muted,
-    marginBottom: spacing.xxs,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "900",
-    letterSpacing: -0.5,
-    color: colors.ink,
-    textTransform: "uppercase",
-    marginBottom: spacing.sm,
   },
   card: {
     padding: spacing.md,

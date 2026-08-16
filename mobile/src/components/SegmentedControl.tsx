@@ -14,7 +14,11 @@ export default function SegmentedControl<Option extends string | number>({
   accessibilityLabel: string;
 }) {
   return (
-    <View accessibilityLabel={accessibilityLabel} style={styles.container}>
+    <View
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="radiogroup"
+      style={styles.container}
+    >
       {options.map((option) => {
         const selected = option.value === value;
         return (
@@ -29,7 +33,13 @@ export default function SegmentedControl<Option extends string | number>({
               pressed && styles.pressed,
             ]}
           >
-            <Text style={[styles.label, selected && styles.selectedLabel]}>
+            <Text
+              adjustsFontSizeToFit
+              maxFontSizeMultiplier={1.3}
+              minimumFontScale={0.8}
+              numberOfLines={1}
+              style={[styles.label, selected && styles.selectedLabel]}
+            >
               {option.label}
             </Text>
           </Pressable>

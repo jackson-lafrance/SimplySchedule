@@ -32,6 +32,15 @@ import { colors, radii, spacing, typography } from "@/theme";
 
 const { height } = Dimensions.get("window");
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
+const WEEKDAY_NAMES = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
 const ORDINALS: { value: number | -1; label: string }[] = [
   { value: 1, label: "1ST" },
   { value: 2, label: "2ND" },
@@ -47,11 +56,37 @@ const FREQUENCIES: { value: RecurrenceFrequency; label: string }[] = [
   { value: "monthly", label: "MONTH" },
   { value: "yearly", label: "YEAR" },
 ];
+const MONTHS = [
+  { label: "JAN", accessibilityLabel: "January" },
+  { label: "FEB", accessibilityLabel: "February" },
+  { label: "MAR", accessibilityLabel: "March" },
+  { label: "APR", accessibilityLabel: "April" },
+  { label: "MAY", accessibilityLabel: "May" },
+  { label: "JUN", accessibilityLabel: "June" },
+  { label: "JUL", accessibilityLabel: "July" },
+  { label: "AUG", accessibilityLabel: "August" },
+  { label: "SEP", accessibilityLabel: "September" },
+  { label: "OCT", accessibilityLabel: "October" },
+  { label: "NOV", accessibilityLabel: "November" },
+  { label: "DEC", accessibilityLabel: "December" },
+];
 
 type ItemType = "task" | "event";
 
 function deviceTimeZone() {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+}
+
+function readableItemError(error: unknown) {
+  console.error("Could not save schedule item", error);
+  if (
+    error instanceof Error &&
+    !("code" in error) &&
+    error.message.trim().length > 0
+  ) {
+    return error.message;
+  }
+  return "THE ITEM COULD NOT BE SAVED. TRY AGAIN.";
 }
 
 function initialEventDraft(date: string): EventDraft {
@@ -87,16 +122,18 @@ function Chip({
   selected,
   onPress,
   accessibilityLabel,
+  role = "checkbox",
 }: {
   label: string;
   selected: boolean;
   onPress: () => void;
   accessibilityLabel?: string;
+  role?: "checkbox" | "radio";
 }) {
   return (
     <Pressable
       accessibilityLabel={accessibilityLabel ?? label}
-      accessibilityRole="checkbox"
+      accessibilityRole={role}
       accessibilityState={{ checked: selected }}
       onPress={onPress}
       style={({ pressed }) => [
@@ -105,7 +142,10 @@ function Chip({
         pressed && styles.pressed,
       ]}
     >
-      <Text style={[styles.chipText, selected && styles.selectedChipText]}>
+      <Text
+        maxFontSizeMultiplier={1.3}
+        style={[styles.chipText, selected && styles.selectedChipText]}
+      >
         {label}
       </Text>
     </Pressable>
@@ -137,6 +177,7 @@ export default function CreateItemSheet({
     initialTaskDraft(initialDate),
   );
   const [saving, setSaving] = useState(false);
+  const [confirmingDiscard, setConfirmingDiscard] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const slide = useRef(new Animated.Value(height)).current;
   const insets = useSafeAreaInsets();
@@ -150,6 +191,7 @@ export default function CreateItemSheet({
     setTaskDraft(initialTaskDraft(initialDate));
     setErrorMessage(null);
     setSaving(false);
+    setConfirmingDiscard(false);
     slide.setValue(height);
     Animated.spring(slide, {
       toValue: 0,
@@ -159,13 +201,27 @@ export default function CreateItemSheet({
     }).start();
   }, [initialDate, slide, visible]);
 
-  const close = () => {
-    if (saving) return;
+  const finishClose = () => {
     Animated.timing(slide, {
       toValue: height,
       duration: 200,
       useNativeDriver: true,
     }).start(onClose);
+  };
+  const hasUnsavedChanges = () =>
+    JSON.stringify(eventDraft) !== JSON.stringify(initialEventDraft(initialDate)) ||
+    JSON.stringify(taskDraft) !== JSON.stringify(initialTaskDraft(initialDate));
+  const requestClose = () => {
+    if (saving) return;
+    if (confirmingDiscard) {
+      setConfirmingDiscard(false);
+      return;
+    }
+    if (hasUnsavedChanges()) {
+      setConfirmingDiscard(true);
+      return;
+    }
+    finishClose();
   };
   const updateEvent = <Key extends keyof EventDraft>(
     key: Key,
@@ -192,11 +248,7 @@ export default function CreateItemSheet({
       onClose();
     } catch (error) {
       setSaving(false);
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "THE ITEM COULD NOT BE SAVED. TRY AGAIN.",
-      );
+      setErrorMessage(readableItemError(error));
     }
   };
 
@@ -214,7 +266,7 @@ export default function CreateItemSheet({
   return (
     <Modal
       animationType="fade"
-      onRequestClose={close}
+      onRequestClose={requestClose}
       transparent
       visible={visible}
     >
@@ -223,6 +275,10 @@ export default function CreateItemSheet({
         style={styles.overlay}
       >
         <Animated.View
+          accessibilityElementsHidden={confirmingDiscard}
+          importantForAccessibility={
+            confirmingDiscard ? "no-hide-descendants" : "auto"
+          }
           style={[
             styles.sheet,
             {
@@ -232,12 +288,14 @@ export default function CreateItemSheet({
           ]}
         >
           <View style={styles.header}>
-            <Text style={styles.title}>ADD ITEM</Text>
+            <Text maxFontSizeMultiplier={1.4} style={styles.title}>
+              ADD ITEM
+            </Text>
             <Pressable
               accessibilityLabel="Close add item"
               accessibilityRole="button"
               hitSlop={8}
-              onPress={close}
+              onPress={requestClose}
             >
               <MaterialIcons name="close" size={28} color={colors.ink} />
             </Pressable>
@@ -339,7 +397,7 @@ export default function CreateItemSheet({
                   />
                 </View>
                 <View style={styles.field}>
-                  <FieldLabel>START ANCHOR · YYYY-MM-DD</FieldLabel>
+                  <FieldLabel>DATE</FieldLabel>
                   <TextInput
                     accessibilityLabel="Event start date"
                     autoCorrect={false}
@@ -460,7 +518,11 @@ export default function CreateItemSheet({
                               value={eventDraft.interval}
                             />
                           </View>
-                          <View style={styles.frequencyChips}>
+                          <View
+                            accessibilityLabel="Repeat frequency"
+                            accessibilityRole="radiogroup"
+                            style={styles.frequencyChips}
+                          >
                             {FREQUENCIES.map((option) => (
                               <Chip
                                 key={option.value}
@@ -468,6 +530,7 @@ export default function CreateItemSheet({
                                 onPress={() =>
                                   updateEvent("frequency", option.value)
                                 }
+                                role="radio"
                                 selected={eventDraft.frequency === option.value}
                               />
                             ))}
@@ -480,7 +543,7 @@ export default function CreateItemSheet({
                             <View style={styles.weekdays}>
                               {WEEKDAYS.map((label, day) => (
                                 <Chip
-                                  accessibilityLabel={`Repeat on ${label}`}
+                                  accessibilityLabel={`Repeat on ${WEEKDAY_NAMES[day]}`}
                                   key={`${label}-${day}`}
                                   label={label}
                                   onPress={() => toggleWeekday(day)}
@@ -496,17 +559,35 @@ export default function CreateItemSheet({
                           <>
                             {eventDraft.frequency === "yearly" ? (
                               <View style={styles.field}>
-                                <FieldLabel>MONTH · 1–12</FieldLabel>
-                                <TextInput
+                                <FieldLabel>MONTH</FieldLabel>
+                                <View
                                   accessibilityLabel="Month of year"
-                                  keyboardType="number-pad"
-                                  maxLength={2}
-                                  onChangeText={(value) =>
-                                    updateEvent("monthOfYear", value)
-                                  }
-                                  style={styles.input}
-                                  value={eventDraft.monthOfYear}
-                                />
+                                  accessibilityRole="radiogroup"
+                                  style={styles.wrapChips}
+                                >
+                                  {MONTHS.map((option, index) => {
+                                    const month = index + 1;
+                                    return (
+                                      <Chip
+                                        accessibilityLabel={
+                                          option.accessibilityLabel
+                                        }
+                                        key={option.label}
+                                        label={option.label}
+                                        onPress={() =>
+                                          updateEvent(
+                                            "monthOfYear",
+                                            String(month),
+                                          )
+                                        }
+                                        role="radio"
+                                        selected={
+                                          Number(eventDraft.monthOfYear) === month
+                                        }
+                                      />
+                                    );
+                                  })}
+                                </View>
                               </View>
                             ) : null}
                             <SegmentedControl
@@ -525,21 +606,50 @@ export default function CreateItemSheet({
                             />
                             {eventDraft.calendarSelectorMode === "dayOfMonth" ? (
                               <View style={styles.field}>
-                                <FieldLabel>DAY OF MONTH · 1–31 OR -1 FOR LAST</FieldLabel>
-                                <TextInput
-                                  accessibilityLabel="Day of month"
-                                  keyboardType="numbers-and-punctuation"
-                                  maxLength={2}
-                                  onChangeText={(value) =>
-                                    updateEvent("dayOfMonth", value)
-                                  }
-                                  style={styles.input}
-                                  value={eventDraft.dayOfMonth}
-                                />
+                                <FieldLabel>DAY OF MONTH</FieldLabel>
+                                <View style={styles.quickRow}>
+                                  <TextInput
+                                    accessibilityLabel="Numeric day of month"
+                                    keyboardType="number-pad"
+                                    maxLength={2}
+                                    onChangeText={(value) =>
+                                      updateEvent("dayOfMonth", value)
+                                    }
+                                    placeholder="1–31"
+                                    placeholderTextColor={colors.muted}
+                                    style={[styles.input, styles.quickField]}
+                                    value={
+                                      eventDraft.dayOfMonth === "-1"
+                                        ? ""
+                                        : eventDraft.dayOfMonth
+                                    }
+                                  />
+                                  <View style={styles.lastDayOption}>
+                                    <Chip
+                                      label="LAST DAY"
+                                      onPress={() =>
+                                        updateEvent(
+                                          "dayOfMonth",
+                                          eventDraft.dayOfMonth === "-1"
+                                            ? String(
+                                                Number(eventDraft.date.slice(-2)) ||
+                                                  1,
+                                              )
+                                            : "-1",
+                                        )
+                                      }
+                                      selected={eventDraft.dayOfMonth === "-1"}
+                                    />
+                                  </View>
+                                </View>
                               </View>
                             ) : (
                               <>
-                                <View style={styles.wrapChips}>
+                                <View
+                                  accessibilityLabel="Week of month"
+                                  accessibilityRole="radiogroup"
+                                  style={styles.wrapChips}
+                                >
                                   {ORDINALS.map((option) => (
                                     <Chip
                                       key={option.value}
@@ -547,20 +657,27 @@ export default function CreateItemSheet({
                                       onPress={() =>
                                         updateEvent("weekOfMonth", option.value)
                                       }
+                                      role="radio"
                                       selected={
                                         eventDraft.weekOfMonth === option.value
                                       }
                                     />
                                   ))}
                                 </View>
-                                <View style={styles.weekdays}>
+                                <View
+                                  accessibilityLabel="Weekday of month"
+                                  accessibilityRole="radiogroup"
+                                  style={styles.weekdays}
+                                >
                                   {WEEKDAYS.map((label, day) => (
                                     <Chip
+                                      accessibilityLabel={WEEKDAY_NAMES[day]}
                                       key={`${label}-${day}`}
                                       label={label}
                                       onPress={() =>
                                         updateEvent("ordinalWeekday", day)
                                       }
+                                      role="radio"
                                       selected={
                                         eventDraft.ordinalWeekday === day
                                       }
@@ -614,18 +731,6 @@ export default function CreateItemSheet({
                           </View>
                         ) : null}
 
-                        <View style={styles.timezoneNote}>
-                          <MaterialIcons
-                            name="schedule"
-                            size={18}
-                            color={colors.ink}
-                          />
-                          <Text style={styles.timezoneText}>
-                            {timeZone.toUpperCase()} · DAY/WEEK/MONTH/YEAR RULES
-                            KEEP LOCAL WALL TIME THROUGH DST. HOURLY RULES USE
-                            ELAPSED HOURS.
-                          </Text>
-                        </View>
                       </View>
                     ) : null}
                   </>
@@ -641,7 +746,7 @@ export default function CreateItemSheet({
                 pressed && styles.pressed,
               ]}
             >
-              <Text style={styles.moreText}>
+              <Text maxFontSizeMultiplier={1.3} style={styles.moreText}>
                 {advanced ? "HIDE OPTIONS" : "MORE OPTIONS"}
               </Text>
               <MaterialIcons
@@ -662,13 +767,21 @@ export default function CreateItemSheet({
             <Pressable
               accessibilityRole="button"
               disabled={saving}
-              onPress={close}
+              onPress={requestClose}
               style={({ pressed }) => [
                 styles.cancelButton,
                 pressed && styles.pressed,
               ]}
             >
-              <Text style={styles.cancelText}>CANCEL</Text>
+              <Text
+                adjustsFontSizeToFit
+                maxFontSizeMultiplier={1.3}
+                minimumFontScale={0.8}
+                numberOfLines={1}
+                style={styles.cancelText}
+              >
+                CANCEL
+              </Text>
             </Pressable>
             <Pressable
               accessibilityRole="button"
@@ -681,12 +794,55 @@ export default function CreateItemSheet({
               ]}
               testID="save-item-button"
             >
-              <Text style={styles.saveText}>
+              <Text
+                adjustsFontSizeToFit
+                maxFontSizeMultiplier={1.3}
+                minimumFontScale={0.8}
+                numberOfLines={1}
+                style={styles.saveText}
+              >
                 {saving ? "SAVING…" : `ADD ${itemType.toUpperCase()}`}
               </Text>
             </Pressable>
           </View>
         </Animated.View>
+
+        {confirmingDiscard ? (
+          <View accessibilityViewIsModal style={styles.confirmOverlay}>
+            <View style={styles.confirmCard}>
+              <Text style={styles.confirmTitle}>DISCARD ITEM?</Text>
+              <Text style={styles.confirmBody}>
+                YOUR CHANGES WILL NOT BE SAVED.
+              </Text>
+              <View style={styles.confirmActions}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => setConfirmingDiscard(false)}
+                  style={({ pressed }) => [
+                    styles.confirmButton,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <Text style={styles.confirmButtonText}>KEEP EDITING</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => {
+                    setConfirmingDiscard(false);
+                    finishClose();
+                  }}
+                  style={({ pressed }) => [
+                    styles.confirmButton,
+                    styles.discardButton,
+                    pressed && styles.discardPressed,
+                  ]}
+                >
+                  <Text style={styles.discardText}>DISCARD</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        ) : null}
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -697,6 +853,66 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "flex-end",
     backgroundColor: "rgba(0,0,0,0.5)",
+  },
+  confirmOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    padding: spacing.lg,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  confirmCard: {
+    width: "100%",
+    maxWidth: 360,
+    padding: spacing.xl,
+    borderWidth: 2,
+    borderColor: colors.ink,
+    borderRadius: 12,
+    backgroundColor: colors.background,
+  },
+  confirmTitle: {
+    color: colors.ink,
+    fontSize: 22,
+    fontWeight: "900",
+  },
+  confirmBody: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: "800",
+    marginTop: spacing.xs,
+  },
+  confirmActions: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+  },
+  confirmButton: {
+    flex: 1,
+    minHeight: 50,
+    paddingHorizontal: spacing.xs,
+    borderWidth: 2,
+    borderColor: colors.ink,
+    borderRadius: radii.control,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  confirmButtonText: {
+    color: colors.ink,
+    fontSize: 12,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+  discardButton: {
+    backgroundColor: colors.ink,
+  },
+  discardPressed: {
+    backgroundColor: colors.destructive,
+    borderColor: colors.destructive,
+  },
+  discardText: {
+    color: colors.inverse,
+    fontSize: 12,
+    fontWeight: "900",
   },
   sheet: {
     height: "92%",
@@ -754,6 +970,9 @@ const styles = StyleSheet.create({
   },
   quickField: {
     flex: 1,
+  },
+  lastDayOption: {
+    justifyContent: "center",
   },
   moreButton: {
     minHeight: 48,
@@ -864,21 +1083,6 @@ const styles = StyleSheet.create({
   },
   selectedChipText: {
     color: colors.inverse,
-  },
-  timezoneNote: {
-    padding: spacing.sm,
-    borderRadius: radii.control,
-    backgroundColor: colors.surfaceMuted,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: spacing.xs,
-  },
-  timezoneText: {
-    ...typography.caption,
-    color: colors.ink,
-    fontSize: 9,
-    lineHeight: 14,
-    flex: 1,
   },
   error: {
     borderWidth: 2,

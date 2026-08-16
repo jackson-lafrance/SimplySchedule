@@ -13,7 +13,13 @@ import {
 import { expandEventsInRange } from "@/domain/recurrence";
 import { colors } from "@/theme";
 
-export default function HomeScreen() {
+export default function HomeScreen({
+  selectedDate,
+  onSelectDate,
+}: {
+  selectedDate: Date;
+  onSelectDate: (date: Date) => void;
+}) {
   const {
     events: canonicalEvents,
     tasks,
@@ -22,11 +28,15 @@ export default function HomeScreen() {
   } = useSchedule();
   const { preferences } = usePreferences();
   const [today] = useState(() => atLocalNoon(new Date()));
-  const [selectedDate, setSelectedDate] = useState(today);
-  const dates = useMemo(
-    () => Array.from({ length: 29 }, (_, index) => addDays(today, index - 14)),
-    [today],
-  );
+  const dates = useMemo(() => {
+    const distanceFromToday = Math.abs(
+      Math.round((selectedDate.getTime() - today.getTime()) / 86_400_000),
+    );
+    const anchor = distanceFromToday <= 14 ? today : selectedDate;
+    return Array.from({ length: 29 }, (_, index) =>
+      addDays(anchor, index - 14),
+    );
+  }, [selectedDate, today]);
   const range = useMemo(
     () => visibleRangeForDay(selectedDate),
     [selectedDate],
@@ -42,7 +52,7 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <WeekdayStrip
         dates={dates}
-        onSelectDate={setSelectedDate}
+        onSelectDate={onSelectDate}
         selectedDate={selectedDate}
       />
       <ScrollView showsVerticalScrollIndicator={false}>

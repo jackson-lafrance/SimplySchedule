@@ -10,8 +10,8 @@ import { useSchedule } from "@/context/useSchedule";
 import {
   addDays,
   addMonths,
-  atLocalNoon,
   getMonthDays,
+  getWeekDays,
   localDateKey,
   startOfMonth,
   visibleRangeForDay,
@@ -31,8 +31,65 @@ const monthTitle = new Intl.DateTimeFormat("en-US", {
   month: "long",
   year: "numeric",
 });
+const shortMonth = new Intl.DateTimeFormat("en-US", { month: "short" });
 
-export default function CalendarScreen() {
+function weekTitle(days: Date[]) {
+  const first = days[0];
+  const last = days[days.length - 1];
+  if (first.getMonth() === last.getMonth()) {
+    return `${shortMonth.format(first)} ${first.getDate()}–${last.getDate()}`;
+  }
+  return `${shortMonth.format(first)} ${first.getDate()}–${shortMonth.format(last)} ${last.getDate()}`;
+}
+
+function PeriodNavigation({
+  onPrevious,
+  onNext,
+  period,
+}: {
+  onPrevious: () => void;
+  onNext: () => void;
+  period: "day" | "week" | "month";
+}) {
+  return (
+    <View style={styles.periodNavigation}>
+      <Pressable
+        accessibilityLabel={`Previous ${period}`}
+        accessibilityRole="button"
+        onPress={onPrevious}
+        style={({ pressed }) => [
+          styles.navigationButton,
+          pressed && styles.pressed,
+        ]}
+      >
+        <Text maxFontSizeMultiplier={1.3} style={styles.navigationText}>
+          PREV
+        </Text>
+      </Pressable>
+      <Pressable
+        accessibilityLabel={`Next ${period}`}
+        accessibilityRole="button"
+        onPress={onNext}
+        style={({ pressed }) => [
+          styles.navigationButton,
+          pressed && styles.pressed,
+        ]}
+      >
+        <Text maxFontSizeMultiplier={1.3} style={styles.navigationText}>
+          NEXT
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
+export default function CalendarScreen({
+  selectedDate,
+  onSelectDate,
+}: {
+  selectedDate: Date;
+  onSelectDate: (date: Date) => void;
+}) {
   const {
     events: canonicalEvents,
     tasks,
@@ -43,9 +100,10 @@ export default function CalendarScreen() {
   const [mode, setMode] = useState<CalendarMode>(
     preferences.defaultCalendarView,
   );
-  const [selectedDate, setSelectedDate] = useState(() =>
-    atLocalNoon(new Date()),
-  );
+
+  useEffect(() => {
+    setMode(preferences.defaultCalendarView);
+  }, [preferences.defaultCalendarView]);
 
   const range = useMemo(() => {
     if (mode === "day") return visibleRangeForDay(selectedDate);
@@ -58,24 +116,21 @@ export default function CalendarScreen() {
     () => expandEventsInRange(canonicalEvents, range),
     [canonicalEvents, range],
   );
-  const stripDates = useMemo(
-    () =>
-      Array.from({ length: 29 }, (_, index) =>
-        addDays(selectedDate, index - 14),
-      ),
-    [selectedDate],
+  const weekDays = useMemo(
+    () => getWeekDays(selectedDate, preferences.weekStartsOn),
+    [preferences.weekStartsOn, selectedDate],
   );
   const monthDays = useMemo(
-    () =>
-      getMonthDays(selectedDate, new Date(), preferences.weekStartsOn),
+    () => getMonthDays(selectedDate, new Date(), preferences.weekStartsOn),
     [preferences.weekStartsOn, selectedDate],
   );
 
   useEffect(() => setVisibleRange(range), [range, setVisibleRange]);
 
-  const heading =
-    mode === "month"
-      ? monthTitle.format(selectedDate)
+  const heading = mode === "month"
+    ? monthTitle.format(selectedDate)
+    : mode === "week"
+      ? weekTitle(weekDays)
       : dayTitle.format(selectedDate);
 
   return (
@@ -84,6 +139,7 @@ export default function CalendarScreen() {
         <Text
           adjustsFontSizeToFit
           accessibilityRole="header"
+          maxFontSizeMultiplier={1.3}
           minimumFontScale={0.72}
           numberOfLines={1}
           style={styles.title}
@@ -102,66 +158,63 @@ export default function CalendarScreen() {
         />
       </View>
 
-      {mode === "month" ? (
-        <ScrollView showsVerticalScrollIndicator={false}>
-          <View style={styles.monthNavigation}>
-            <Pressable
-              accessibilityLabel="Previous month"
-              accessibilityRole="button"
-              onPress={() =>
-                setSelectedDate((date) => addMonths(startOfMonth(date), -1))
-              }
-              style={({ pressed }) => [pressed && styles.pressed]}
-            >
-              <Text style={styles.navigationText}>PREV</Text>
-            </Pressable>
-            <Pressable
-              accessibilityLabel="Next month"
-              accessibilityRole="button"
-              onPress={() =>
-                setSelectedDate((date) => addMonths(startOfMonth(date), 1))
-              }
-              style={({ pressed }) => [pressed && styles.pressed]}
-            >
-              <Text style={styles.navigationText}>NEXT</Text>
-            </Pressable>
-          </View>
-          <View style={styles.monthContent}>
-            <MonthGrid
-              days={monthDays}
-              events={events}
-              onSelectDay={(day) => setSelectedDate(day.date)}
-              selectedKey={localDateKey(selectedDate)}
-              tasks={tasks}
-              weekStartsOn={preferences.weekStartsOn}
-            />
-          </View>
-          <AgendaList
-            dates={[selectedDate]}
-            events={events}
-            onCompleteTask={completeTask}
-            tasks={tasks}
-            timeDisplay={preferences.timeDisplay}
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {mode === "day" ? (
+          <PeriodNavigation
+            onNext={() => onSelectDate(addDays(selectedDate, 1))}
+            onPrevious={() => onSelectDate(addDays(selectedDate, -1))}
+            period="day"
           />
-        </ScrollView>
-      ) : (
-        <>
-          <WeekdayStrip
-            dates={stripDates}
-            onSelectDate={setSelectedDate}
-            selectedDate={selectedDate}
-          />
-          <ScrollView showsVerticalScrollIndicator={false}>
-            <AgendaList
-              dates={[selectedDate]}
-              events={events}
-              onCompleteTask={completeTask}
-              tasks={tasks}
-              timeDisplay={preferences.timeDisplay}
+        ) : null}
+
+        {mode === "week" ? (
+          <>
+            <PeriodNavigation
+              onNext={() => onSelectDate(addDays(selectedDate, 7))}
+              onPrevious={() => onSelectDate(addDays(selectedDate, -7))}
+              period="week"
             />
-          </ScrollView>
-        </>
-      )}
+            <WeekdayStrip
+              dates={weekDays}
+              fitted
+              onSelectDate={onSelectDate}
+              selectedDate={selectedDate}
+            />
+          </>
+        ) : null}
+
+        {mode === "month" ? (
+          <>
+            <PeriodNavigation
+              onNext={() =>
+                onSelectDate(addMonths(startOfMonth(selectedDate), 1))
+              }
+              onPrevious={() =>
+                onSelectDate(addMonths(startOfMonth(selectedDate), -1))
+              }
+              period="month"
+            />
+            <View style={styles.monthContent}>
+              <MonthGrid
+                days={monthDays}
+                events={events}
+                onSelectDay={(day) => onSelectDate(day.date)}
+                selectedKey={localDateKey(selectedDate)}
+                tasks={tasks}
+                weekStartsOn={preferences.weekStartsOn}
+              />
+            </View>
+          </>
+        ) : null}
+
+        <AgendaList
+          dates={[selectedDate]}
+          events={events}
+          onCompleteTask={completeTask}
+          tasks={tasks}
+          timeDisplay={preferences.timeDisplay}
+        />
+      </ScrollView>
     </View>
   );
 }
@@ -183,13 +236,19 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
     textTransform: "uppercase",
   },
-  monthNavigation: {
-    minHeight: 48,
+  periodNavigation: {
+    minHeight: 52,
     paddingHorizontal: spacing.lg,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: spacing.md,
+  },
+  navigationButton: {
+    minWidth: 56,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
   },
   navigationText: {
     color: colors.ink,

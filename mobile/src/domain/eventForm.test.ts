@@ -200,6 +200,18 @@ test("summarizes flexible recurrence without hiding its cadence", () => {
     ),
     "EVERY 2 WEEKS · MON, WED, FRI",
   );
+  assert.equal(
+    recurrenceDraftSummary(
+      draft({
+        recurrenceEnabled: true,
+        frequency: "yearly",
+        monthOfYear: "11",
+        calendarSelectorMode: "dayOfMonth",
+        dayOfMonth: "-1",
+      }),
+    ),
+    "EVERY YEAR · NOV · LAST DAY",
+  );
 });
 
 test("align helper preserves the canonical first-occurrence invariant", () => {

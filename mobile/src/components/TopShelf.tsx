@@ -49,13 +49,24 @@ export default function TopShelf({
     }).start(() => setVisible(false));
   };
 
-  const sourceLabel = source === "firebase" ? "FIREBASE SYNC" : "LOCAL PREVIEW";
+  const sourceLabel = source === "firebase" ? "CLOUD SYNC" : "THIS SESSION";
   const statusLabel =
-    status === "loading" ? "CONNECTING" : status === "error" ? "NEEDS ATTENTION" : "READY";
+    status === "loading"
+      ? "CONNECTING"
+      : status === "error"
+        ? "NEEDS ATTENTION"
+        : "READY";
 
   return (
     <View style={styles.shelf}>
-      <Text accessibilityRole="header" style={styles.logo}>
+      <Text
+        accessibilityRole="header"
+        adjustsFontSizeToFit
+        maxFontSizeMultiplier={1.2}
+        minimumFontScale={0.78}
+        numberOfLines={1}
+        style={styles.logo}
+      >
         SimplySchedule
       </Text>
       <Pressable
@@ -68,7 +79,15 @@ export default function TopShelf({
         ]}
       >
         <MaterialIcons name="person" size={28} color={colors.ink} />
-        <Text style={styles.profileLabel}>PROFILE</Text>
+        <Text
+          adjustsFontSizeToFit
+          maxFontSizeMultiplier={1.3}
+          minimumFontScale={0.8}
+          numberOfLines={1}
+          style={styles.profileLabel}
+        >
+          PROFILE
+        </Text>
       </Pressable>
 
       <Modal
@@ -103,12 +122,7 @@ export default function TopShelf({
                 <MaterialIcons name="person" size={40} color={colors.ink} />
               </View>
               <Text style={styles.profileTitle}>
-                {source === "firebase" ? "SYNCED SCHEDULE" : "LOCAL SCHEDULE"}
-              </Text>
-              <Text style={styles.profileBody}>
-                {source === "firebase"
-                  ? "Your anonymous Firebase profile keeps tasks and events in this emulator or project."
-                  : "Tasks and events stay on this device for the current app session."}
+                {source === "firebase" ? "SYNCED SCHEDULE" : "LOCAL PREVIEW"}
               </Text>
 
               <View style={styles.statusCard}>
@@ -227,15 +241,8 @@ const styles = StyleSheet.create({
     color: colors.ink,
     textAlign: "center",
   },
-  profileBody: {
-    ...typography.caption,
-    color: colors.muted,
-    lineHeight: 18,
-    textAlign: "center",
-    marginTop: spacing.xs,
-    marginBottom: spacing.xl,
-  },
   statusCard: {
+    marginTop: spacing.xl,
     width: "100%",
     borderWidth: 2,
     borderColor: colors.ink,

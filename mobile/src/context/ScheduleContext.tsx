@@ -49,7 +49,7 @@ const initialState: ScheduleState = configuredClient
 
 function readableScheduleError(error: unknown) {
   console.error(error);
-  return "THE SCHEDULE COULD NOT SYNC. CHECK FIREBASE AND TRY AGAIN.";
+  return "THE SCHEDULE COULD NOT SYNC. CHECK YOUR CONNECTION AND TRY AGAIN.";
 }
 
 function sameRange(left: VisibleRange, right: VisibleRange) {
@@ -78,9 +78,13 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
     if (!configuredClient) return;
 
     let active = true;
+    let failed = false;
+    let eventsReady = false;
+    let tasksReady = false;
     const unsubscribes: (() => void)[] = [];
     const fail = (error: unknown) => {
-      if (!active) return;
+      if (!active || failed) return;
+      failed = true;
       setState((current) => ({
         ...current,
         status: "error",
@@ -91,14 +95,17 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
       key: Key,
       value: ScheduleState[Key],
     ) => {
-      if (!active) return;
+      if (!active || failed) return;
+      if (key === "events") eventsReady = true;
+      if (key === "tasks") tasksReady = true;
+      const scheduleReady = eventsReady && tasksReady;
       setState((current) => ({
         ...current,
         [key]: value,
-        status: "ready",
+        status: scheduleReady ? "ready" : "loading",
         source: "firebase",
         errorMessage: null,
-        lastUpdatedAt: new Date(),
+        lastUpdatedAt: scheduleReady ? new Date() : current.lastUpdatedAt,
       }));
     };
 
