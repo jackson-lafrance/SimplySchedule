@@ -30,7 +30,6 @@ export default function AppShell() {
   } = useSchedule();
   const [activeTab, setActiveTab] = useState<PrimaryTab>("home");
   const [adding, setAdding] = useState(false);
-  const [homeDate, setHomeDate] = useState(() => atLocalNoon(new Date()));
   const [calendarDate, setCalendarDate] = useState(() =>
     atLocalNoon(new Date()),
   );
@@ -62,12 +61,7 @@ export default function AppShell() {
 
     switch (activeTab) {
       case "home":
-        return (
-          <HomeScreen
-            onSelectDate={setHomeDate}
-            selectedDate={homeDate}
-          />
-        );
+        return <HomeScreen />;
       case "calendar":
         return (
           <CalendarScreen
@@ -103,9 +97,7 @@ export default function AppShell() {
         onAdd={() => {
           const selectedDate = activeTab === "calendar"
             ? calendarDate
-            : activeTab === "home"
-              ? homeDate
-              : new Date();
+            : new Date();
           setAddDate(localDateKey(selectedDate));
           setAdding(true);
         }}
@@ -114,9 +106,8 @@ export default function AppShell() {
       <CreateItemSheet
         initialDate={addDate}
         onClose={() => setAdding(false)}
-        onSaved={(date) => {
+        onSaved={() => {
           setAdding(false);
-          setHomeDate(atLocalNoon(date));
           setActiveTab("home");
         }}
         visible={adding}

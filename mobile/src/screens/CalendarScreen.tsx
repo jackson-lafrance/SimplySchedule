@@ -1,3 +1,4 @@
+import { MaterialIcons } from "@expo/vector-icons";
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
@@ -62,9 +63,11 @@ function PeriodNavigation({
           pressed && styles.pressed,
         ]}
       >
-        <Text maxFontSizeMultiplier={1.3} style={styles.navigationText}>
-          PREV
-        </Text>
+        <MaterialIcons
+          name="arrow-back"
+          size={24}
+          color={colors.ink}
+        />
       </Pressable>
       <Pressable
         accessibilityLabel={`Next ${period}`}
@@ -75,9 +78,11 @@ function PeriodNavigation({
           pressed && styles.pressed,
         ]}
       >
-        <Text maxFontSizeMultiplier={1.3} style={styles.navigationText}>
-          NEXT
-        </Text>
+        <MaterialIcons
+          name="arrow-forward"
+          size={24}
+          color={colors.ink}
+        />
       </Pressable>
     </View>
   );
@@ -249,11 +254,6 @@ const styles = StyleSheet.create({
     minHeight: 44,
     alignItems: "center",
     justifyContent: "center",
-  },
-  navigationText: {
-    color: colors.ink,
-    fontSize: 11,
-    fontWeight: "900",
   },
   pressed: {
     opacity: 0.5,

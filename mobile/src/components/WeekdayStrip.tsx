@@ -39,6 +39,7 @@ export default function WeekdayStrip({
       ]}
       horizontal
       ref={scroll}
+      style={styles.scroll}
       scrollEnabled={!fitted}
       showsHorizontalScrollIndicator={false}
     >
@@ -82,6 +83,9 @@ export default function WeekdayStrip({
 }
 
 const styles = StyleSheet.create({
+  scroll: {
+    flexGrow: 0,
+  },
   content: {
     gap: spacing.xs,
     paddingHorizontal: spacing.lg,

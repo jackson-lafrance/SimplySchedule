@@ -65,7 +65,6 @@ export default function MonthGrid({
               style={({ pressed }) => [
                 styles.day,
                 selected && styles.selected,
-                day.isToday && !selected && styles.today,
                 pressed && styles.pressed,
               ]}
             >
@@ -79,9 +78,7 @@ export default function MonthGrid({
               >
                 {day.dayNumber}
               </Text>
-              {count > 0 ? (
-                <View style={[styles.dot, selected && styles.selectedDot]} />
-              ) : null}
+              {day.isToday ? <View style={styles.todayDot} /> : null}
             </Pressable>
           );
         })}
@@ -120,9 +117,6 @@ const styles = StyleSheet.create({
   selected: {
     backgroundColor: colors.ink,
   },
-  today: {
-    backgroundColor: colors.surfaceMuted,
-  },
   pressed: {
     opacity: 0.6,
   },
@@ -137,14 +131,11 @@ const styles = StyleSheet.create({
   selectedText: {
     color: colors.inverse,
   },
-  dot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
+  todayDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
     marginTop: 2,
-    backgroundColor: colors.ink,
-  },
-  selectedDot: {
-    backgroundColor: colors.success,
+    backgroundColor: "#A7E8B8",
   },
 });

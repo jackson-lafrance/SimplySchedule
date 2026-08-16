@@ -9,7 +9,11 @@ import {
   View,
 } from "react-native";
 
-import { eventsForDate, tasksForDate } from "@/domain/calendar";
+import {
+  eventsForDate,
+  localDateKey,
+  tasksForDate,
+} from "@/domain/calendar";
 import type { EventOccurrence } from "@/domain/events";
 import type { TimeDisplay } from "@/domain/preferences";
 import type { ScheduleTask } from "@/domain/tasks";
@@ -35,38 +39,56 @@ function eventTime(event: EventOccurrence, timeDisplay: TimeDisplay) {
     : start;
 }
 
+const sectionTitle = new Intl.DateTimeFormat("en-US", {
+  weekday: "long",
+  month: "long",
+  day: "numeric",
+});
+
+function sortItems(items: SelectedItem[]) {
+  return items.sort((left, right) => {
+    const leftDate =
+      left.type === "task" ? left.item.dueAt : left.item.startsAt;
+    const rightDate =
+      right.type === "task" ? right.item.dueAt : right.item.startsAt;
+    return (leftDate?.getTime() ?? 0) - (rightDate?.getTime() ?? 0);
+  });
+}
+
 export default function AgendaList({
   dates,
   events,
   tasks,
   timeDisplay,
   onCompleteTask,
+  sectioned = false,
+  currentDate,
+  onCurrentDateLayout,
 }: {
   dates: Date[];
   events: EventOccurrence[];
   tasks: ScheduleTask[];
   timeDisplay: TimeDisplay;
   onCompleteTask: (taskId: string) => Promise<void>;
+  sectioned?: boolean;
+  currentDate?: Date;
+  onCurrentDateLayout?: (offset: number) => void;
 }) {
   const [selected, setSelected] = useState<SelectedItem | null>(null);
   const [completingTask, setCompletingTask] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  const items: SelectedItem[] = dates
-    .flatMap((date) => [
+  const sections = dates.map((date) => ({
+    date,
+    items: sortItems([
       ...tasksForDate(tasks, date).map(
         (item): SelectedItem => ({ type: "task", item }),
       ),
       ...eventsForDate(events, date).map(
         (item): SelectedItem => ({ type: "event", item }),
       ),
-    ])
-    .sort((left, right) => {
-      const leftDate =
-        left.type === "task" ? left.item.dueAt : left.item.startsAt;
-      const rightDate =
-        right.type === "task" ? right.item.dueAt : right.item.startsAt;
-      return (leftDate?.getTime() ?? 0) - (rightDate?.getTime() ?? 0);
-    });
+    ]),
+  }));
+  const items = sections.flatMap((section) => section.items);
 
   const openDetails = (item: SelectedItem) => {
     setActionError(null);
@@ -92,49 +114,80 @@ export default function AgendaList({
     }
   };
 
+  const renderItem = (selectedItem: SelectedItem, keyPrefix = "") => {
+    let timing: string;
+    if (selectedItem.type === "task") {
+      timing = selectedItem.item.dueAt
+        ? `DUE ${timeLabel(selectedItem.item.dueAt, timeDisplay)}`
+        : "NO DUE TIME";
+    } else {
+      timing = eventTime(selectedItem.item, timeDisplay);
+    }
+    const item = selectedItem.item;
+    const isTask = selectedItem.type === "task";
+    return (
+      <Pressable
+        accessibilityHint="Opens item details"
+        accessibilityLabel={`${isTask ? "Task" : "Event"}, ${item.title}, ${timing}`}
+        accessibilityRole="button"
+        key={`${keyPrefix}${selectedItem.type}-${item.id}`}
+        onPress={() => openDetails(selectedItem)}
+        style={({ pressed }) => [
+          styles.item,
+          isTask ? styles.taskItem : styles.eventItem,
+          pressed && styles.pressed,
+        ]}
+      >
+        <Text
+          style={[
+            styles.timing,
+            isTask ? styles.taskText : styles.eventText,
+          ]}
+        >
+          {timing}
+        </Text>
+        <Text numberOfLines={1} style={styles.title}>
+          {item.title}
+        </Text>
+      </Pressable>
+    );
+  };
+
+  const currentKey = currentDate ? localDateKey(currentDate) : null;
+
   return (
-    <View style={styles.container}>
-      {items.length === 0 ? (
-        <Text style={styles.empty}>NOTHING SCHEDULED</Text>
-      ) : (
-        items.map((selectedItem) => {
-          let timing: string;
-          if (selectedItem.type === "task") {
-            timing = selectedItem.item.dueAt
-              ? `DUE ${timeLabel(selectedItem.item.dueAt, timeDisplay)}`
-              : "NO DUE TIME";
-          } else {
-            timing = eventTime(selectedItem.item, timeDisplay);
-          }
-          const item = selectedItem.item;
-          const isTask = selectedItem.type === "task";
+    <View style={[styles.container, sectioned && styles.sectionedContainer]}>
+      {sectioned ? (
+        sections.map((section) => {
+          const sectionKey = localDateKey(section.date);
           return (
-            <Pressable
-              accessibilityHint="Opens item details"
-              accessibilityLabel={`${isTask ? "Task" : "Event"}, ${item.title}, ${timing}`}
-              accessibilityRole="button"
-              key={`${selectedItem.type}-${item.id}`}
-              onPress={() => openDetails(selectedItem)}
-              style={({ pressed }) => [
-                styles.item,
-                isTask ? styles.taskItem : styles.eventItem,
-                pressed && styles.pressed,
-              ]}
+            <View
+              key={sectionKey}
+              onLayout={
+                sectionKey === currentKey && onCurrentDateLayout
+                  ? (event) =>
+                      onCurrentDateLayout(event.nativeEvent.layout.y)
+                  : undefined
+              }
+              style={styles.section}
             >
-              <Text
-                style={[
-                  styles.timing,
-                  isTask ? styles.taskText : styles.eventText,
-                ]}
-              >
-                {timing}
+              <Text accessibilityRole="header" style={styles.sectionTitle}>
+                {sectionTitle.format(section.date).toUpperCase()}
               </Text>
-              <Text numberOfLines={1} style={styles.title}>
-                {item.title}
-              </Text>
-            </Pressable>
+              <View style={styles.sectionItems}>
+                {section.items.length > 0 ? (
+                  section.items.map((item) => renderItem(item, `${sectionKey}-`))
+                ) : (
+                  <Text style={styles.sectionEmpty}>NOTHING SCHEDULED</Text>
+                )}
+              </View>
+            </View>
           );
         })
+      ) : items.length === 0 ? (
+        <Text style={styles.empty}>NOTHING SCHEDULED</Text>
+      ) : (
+        items.map((item) => renderItem(item))
       )}
 
       <Modal
@@ -241,6 +294,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xl,
     gap: spacing.sm,
+  },
+  sectionedContainer: {
+    gap: spacing.xl,
+  },
+  section: {
+    gap: spacing.sm,
+  },
+  sectionTitle: {
+    color: colors.ink,
+    fontSize: 18,
+    fontWeight: "900",
+    letterSpacing: -0.25,
+    textTransform: "uppercase",
+  },
+  sectionItems: {
+    gap: spacing.sm,
+  },
+  sectionEmpty: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: "800",
+    paddingVertical: spacing.sm,
   },
   item: {
     minHeight: 72,
