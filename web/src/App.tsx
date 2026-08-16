@@ -1,39 +1,92 @@
 import { useEffect, useMemo, useState } from "react";
 
-import AgendaView from "@/components/AgendaView";
 import CreateEventScreen from "@/components/CreateEventScreen";
 import EventList from "@/components/EventList";
+import HomeView from "@/components/HomeView";
 import MonthGrid from "@/components/MonthGrid";
+import ProfilePanel from "@/components/ProfilePanel";
+import SettingsView from "@/components/SettingsView";
+import WeekView from "@/components/WeekView";
+import { useSchedule } from "@/context/useSchedule";
 import {
+  addDays,
   addMonths,
-  countEventsInMonth,
   eventsForDate,
-  getMonthAgenda,
   getMonthDays,
+  getWeekDays,
   localDateKey,
   startOfMonth,
+  startOfWeek,
+  visibleRangeForDay,
+  visibleRangeForDays,
   visibleRangeForMonth,
+  visibleRangeForWeek,
   type CalendarDay,
 } from "@/domain/calendar";
 import type { CalendarView, CreateEventInput } from "@/domain/events";
 import { expandEventsInRange } from "@/domain/recurrence";
-import { useSchedule } from "@/context/useSchedule";
+
+type AppSection = "home" | "calendar" | "settings";
+type IconName = AppSection | "profile" | "add";
 
 const monthFormatter = new Intl.DateTimeFormat("en-US", {
   month: "long",
   year: "numeric",
 });
-const selectedDateFormatter = new Intl.DateTimeFormat("en-US", {
-  day: "numeric",
-  month: "long",
-  weekday: "long",
-});
 const fullDateFormatter = new Intl.DateTimeFormat("en-US", {
-  day: "numeric",
-  month: "long",
   weekday: "long",
+  month: "long",
+  day: "numeric",
   year: "numeric",
 });
+const shortDateFormatter = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+});
+
+function NavigationIcon({ name }: { name: IconName }) {
+  if (name === "home") {
+    return <path d="M3 11.5 12 4l9 7.5V21h-6v-6H9v6H3z" />;
+  }
+  if (name === "calendar") {
+    return <path d="M5 3v3m14-3v3M4 8h16v13H4zM4 12h16" />;
+  }
+  if (name === "settings") {
+    return (
+      <>
+        <circle cx="12" cy="12" r="3" />
+        <path d="M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2 2m10 10 2 2M19 5l-2 2M7 17l-2 2" />
+      </>
+    );
+  }
+  if (name === "profile") {
+    return <><circle cx="12" cy="8" r="4" /><path d="M4 21c1-5 4-7 8-7s7 2 8 7" /></>;
+  }
+  return <path d="M12 5v14M5 12h14" />;
+}
+
+function Icon({ name }: { name: IconName }) {
+  return (
+    <svg aria-hidden="true" className="nav-icon" fill="none" viewBox="0 0 24 24">
+      <g stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2">
+        <NavigationIcon name={name} />
+      </g>
+    </svg>
+  );
+}
+
+function titleForRange(view: CalendarView, selectedDate: Date) {
+  if (view === "day") {
+    return fullDateFormatter.format(selectedDate);
+  }
+  if (view === "month") {
+    return monthFormatter.format(selectedDate);
+  }
+
+  const weekStart = startOfWeek(selectedDate);
+  const weekEnd = addDays(weekStart, 6);
+  return `${shortDateFormatter.format(weekStart)} – ${shortDateFormatter.format(weekEnd)}`;
+}
 
 export default function App() {
   const {
@@ -47,61 +100,65 @@ export default function App() {
     retry,
   } = useSchedule();
   const [today] = useState(() => new Date());
-  const [anchorDate, setAnchorDate] = useState(() => startOfMonth(today));
+  const [activeSection, setActiveSection] = useState<AppSection>("home");
+  const [calendarView, setCalendarView] = useState<CalendarView>("week");
   const [selectedDate, setSelectedDate] = useState(
     () => new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12),
   );
-  const [view, setView] = useState<CalendarView>("month");
   const [creatingEvent, setCreatingEvent] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
-  const visibleRange = useMemo(
-    () => visibleRangeForMonth(anchorDate),
-    [anchorDate],
-  );
+  const visibleRange = useMemo(() => {
+    if (activeSection !== "calendar") {
+      return visibleRangeForDays(today, 7);
+    }
+    if (calendarView === "day") {
+      return visibleRangeForDay(selectedDate);
+    }
+    if (calendarView === "week") {
+      return visibleRangeForWeek(selectedDate);
+    }
+    return visibleRangeForMonth(selectedDate);
+  }, [activeSection, calendarView, selectedDate, today]);
+
   useEffect(() => setVisibleRange(visibleRange), [setVisibleRange, visibleRange]);
 
   const occurrences = useMemo(
     () => expandEventsInRange(events, visibleRange),
     [events, visibleRange],
   );
-  const monthDays = useMemo(
-    () => getMonthDays(anchorDate, today),
-    [anchorDate, today],
-  );
   const selectedEvents = useMemo(
     () => eventsForDate(occurrences, selectedDate),
     [occurrences, selectedDate],
   );
-  const agenda = useMemo(
-    () => getMonthAgenda(anchorDate, occurrences, today),
-    [anchorDate, occurrences, today],
+  const monthDays = useMemo(
+    () => getMonthDays(selectedDate, today),
+    [selectedDate, today],
   );
-  const scheduledEntryCount = useMemo(
-    () => countEventsInMonth(anchorDate, occurrences),
-    [anchorDate, occurrences],
+  const weekDays = useMemo(
+    () => getWeekDays(selectedDate, occurrences, today),
+    [occurrences, selectedDate, today],
   );
-
-  const moveMonth = (amount: number) => {
-    const nextMonth = addMonths(anchorDate, amount);
-    setAnchorDate(nextMonth);
-    setSelectedDate(nextMonth);
-  };
 
   const goToToday = () => {
     const now = new Date();
-    setAnchorDate(startOfMonth(now));
     setSelectedDate(
       new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12),
     );
   };
 
-  const selectDay = (day: CalendarDay) => {
-    setSelectedDate(day.date);
-    if (!day.isCurrentMonth) {
-      setAnchorDate(startOfMonth(day.date));
+  const moveCalendar = (amount: number) => {
+    if (calendarView === "day") {
+      setSelectedDate((date) => addDays(date, amount));
+    } else if (calendarView === "week") {
+      setSelectedDate((date) => addDays(date, amount * 7));
+    } else {
+      setSelectedDate((date) => addMonths(startOfMonth(date), amount));
     }
   };
+
+  const selectMonthDay = (day: CalendarDay) => setSelectedDate(day.date);
 
   const saveEvent = async (input: CreateEventInput) => {
     await createEvent(input);
@@ -111,236 +168,217 @@ export default function App() {
       input.startsAt.getDate(),
       12,
     );
-    setAnchorDate(startOfMonth(eventDate));
     setSelectedDate(eventDate);
     setSaveMessage(input.kind === "repeating" ? "REPEATING EVENT SAVED." : "EVENT SAVED.");
     setCreatingEvent(false);
+  };
+
+  const openCreateEvent = () => {
+    setSaveMessage(null);
+    setCreatingEvent(true);
   };
 
   return (
     <div className="app-shell">
       <header className="site-header">
         <button
-          className="brand"
-          onClick={goToToday}
-          type="button"
           aria-label="Simply Schedule home"
+          className="wordmark"
+          onClick={() => setActiveSection("home")}
+          type="button"
         >
-          <span className="brand-mark" aria-hidden="true">
-            SS
-          </span>
-          <span className="brand-name">Simply Schedule</span>
+          SimplySchedule
         </button>
-
-        <nav className="primary-nav" aria-label="Primary navigation">
-          <button
-            className="nav-link nav-link-active"
-            onClick={() => setView("month")}
-            type="button"
-          >
-            Calendar
-          </button>
-          <button className="nav-link" onClick={goToToday} type="button">
-            Today
-          </button>
-        </nav>
-
-        <div
-          className={`source-badge source-badge-${source} source-badge-${status}`}
-          aria-live="polite"
+        <button
+          aria-label="Open profile"
+          className="profile-control"
+          onClick={() => setProfileOpen(true)}
+          type="button"
         >
-          <span aria-hidden="true" />
-          {status === "loading"
-            ? "SYNCING"
-            : status === "error"
-              ? "SYNC ERROR"
-              : source === "firebase"
-                ? "FIREBASE LIVE"
-                : "LOCAL PREVIEW"}
-        </div>
+          <Icon name="profile" />
+          <span>Profile</span>
+          <i className={`sync-dot sync-dot-${status}`} aria-hidden="true" />
+        </button>
       </header>
 
-      <main className="page-content">
-        <section className="page-intro" aria-labelledby="page-title">
-          <div>
-            <p className="eyebrow">{creatingEvent ? "Build your schedule" : "Your schedule"}</p>
-            <h1 id="page-title">
-              {creatingEvent ? "Create event" : monthFormatter.format(anchorDate)}
-            </h1>
-            <p className="intro-copy">
-              {creatingEvent
-                ? "ONE CLEAR FORM. REPEAT ONLY WHEN YOU NEED IT."
-                : `${scheduledEntryCount} scheduled ${scheduledEntryCount === 1 ? "entry" : "entries"}`}
-            </p>
-          </div>
-          <div className="intro-actions">
-            {creatingEvent ? (
-              <button className="outline-button" onClick={() => setCreatingEvent(false)} type="button">
-                Back to calendar
-              </button>
-            ) : (
-              <>
-                <button className="outline-button" onClick={goToToday} type="button">
-                  Today
-                </button>
-                <button
-                  className="primary-button"
-                  onClick={() => {
-                    setSaveMessage(null);
-                    setCreatingEvent(true);
-                  }}
-                  type="button"
-                >
-                  Add event
-                </button>
-              </>
-            )}
-          </div>
-        </section>
-
-        {source === "preview" ? (
-          <div className="notice notice-preview" role="status">
-            <strong>LOCAL PREVIEW</strong>
-            <span>
-              Events created here stay in this browser session. Add Firebase values for shared persistence.
-            </span>
-          </div>
-        ) : null}
-
-        {saveMessage ? (
-          <div className="notice notice-success" role="status">
-            <strong>{saveMessage}</strong>
-            <span>THE CALENDAR NOW SHOWS ITS VISIBLE OCCURRENCES.</span>
-          </div>
-        ) : null}
-
-        {status === "error" ? (
-          <div className="notice notice-error" role="alert">
-            <span>{errorMessage}</span>
-            <button onClick={retry} type="button">
-              Retry
-            </button>
-          </div>
-        ) : null}
-
-        {creatingEvent ? (
-          <CreateEventScreen
-            initialDate={localDateKey(selectedDate)}
-            onCancel={() => setCreatingEvent(false)}
-            onSave={saveEvent}
-          />
-        ) : (
-        <section className="calendar-surface" aria-label="Schedule calendar">
-          <div className="calendar-toolbar">
-            <div className="month-navigation" aria-label="Month navigation">
+      <div className="app-body">
+        <aside className="navigation-shelf">
+          <button className="add-event-button" onClick={openCreateEvent} type="button">
+            <Icon name="add" />
+            <span>Add event</span>
+          </button>
+          <nav className="section-tabs" aria-label="Primary navigation">
+            {(["home", "calendar", "settings"] as AppSection[]).map((section) => (
               <button
-                aria-label="Previous month"
-                className="icon-button"
-                onClick={() => moveMonth(-1)}
+                aria-current={activeSection === section ? "page" : undefined}
+                className={activeSection === section ? "tab-active" : ""}
+                key={section}
+                onClick={() => setActiveSection(section)}
                 type="button"
               >
-                <span aria-hidden="true">←</span>
+                <Icon name={section} />
+                <span>{section}</span>
               </button>
-              <div>
-                <p className="eyebrow">Viewing</p>
-                <h2>{monthFormatter.format(anchorDate)}</h2>
-              </div>
-              <button
-                aria-label="Next month"
-                className="icon-button"
-                onClick={() => moveMonth(1)}
-                type="button"
-              >
-                <span aria-hidden="true">→</span>
-              </button>
-            </div>
+            ))}
+          </nav>
+          <p className="shelf-source">
+            <span className={`sync-dot sync-dot-${status}`} aria-hidden="true" />
+            {source === "firebase" ? "FIREBASE" : "LOCAL PREVIEW"}
+          </p>
+        </aside>
 
-            <div className="view-switcher" aria-label="Calendar view">
-              <button
-                aria-pressed={view === "month"}
-                className={view === "month" ? "view-active" : ""}
-                onClick={() => setView("month")}
-                type="button"
-              >
-                Month
-              </button>
-              <button
-                aria-pressed={view === "agenda"}
-                className={view === "agenda" ? "view-active" : ""}
-                onClick={() => setView("agenda")}
-                type="button"
-              >
-                Agenda
-              </button>
-            </div>
-          </div>
-
-          {status === "loading" ? (
-            <div className="loading-rule" role="status">
-              <span />
-              Loading schedule…
+        <main className="main-content">
+          {saveMessage ? (
+            <div className="save-toast" role="status">{saveMessage}</div>
+          ) : null}
+          {status === "error" ? (
+            <div className="notice notice-error" role="alert">
+              <span>{errorMessage}</span>
+              <button onClick={retry} type="button">Retry</button>
             </div>
           ) : null}
 
-          {view === "month" ? (
-            <div className="month-layout">
-              <MonthGrid
-                days={monthDays}
-                events={occurrences}
-                onSelectDay={selectDay}
-                selectedKey={localDateKey(selectedDate)}
-              />
-              <aside className="selected-day" aria-labelledby="selected-day-title">
-                <div className="selected-day-heading">
-                  <p className="eyebrow">
-                    {localDateKey(selectedDate) === localDateKey(today)
-                      ? "Today"
-                      : "Selected day"}
-                  </p>
-                  <h2 id="selected-day-title">
-                    {selectedDateFormatter.format(selectedDate)}
-                  </h2>
-                  <span>
-                    {selectedEvents.length} {selectedEvents.length === 1 ? "event" : "events"}
-                  </span>
+          {activeSection === "home" ? (
+            <HomeView occurrences={occurrences} today={today} />
+          ) : null}
+
+          {activeSection === "calendar" ? (
+            <div className="screen calendar-screen">
+              <header className="screen-heading calendar-screen-heading">
+                <div>
+                  <p className="eyebrow">Your schedule</p>
+                  <h1>Calendar</h1>
+                  <p className="screen-summary">DAY, WEEK, OR MONTH. NOTHING EXTRA.</p>
                 </div>
-                <EventList
-                  emptyMessage="NO EVENTS SCHEDULED."
-                  events={selectedEvents}
-                  showNotes
-                />
-              </aside>
+                <div className="view-switcher" aria-label="Calendar view">
+                  {(["day", "week", "month"] as CalendarView[]).map((view) => (
+                    <button
+                      aria-pressed={calendarView === view}
+                      className={calendarView === view ? "view-active" : ""}
+                      key={view}
+                      onClick={() => setCalendarView(view)}
+                      type="button"
+                    >
+                      {view}
+                    </button>
+                  ))}
+                </div>
+              </header>
+
+              <section className="calendar-surface" aria-label="Schedule calendar">
+                <div className="calendar-toolbar">
+                  <button
+                    aria-label={`Previous ${calendarView}`}
+                    className="icon-button"
+                    onClick={() => moveCalendar(-1)}
+                    type="button"
+                  >
+                    ←
+                  </button>
+                  <div>
+                    <p className="eyebrow">Viewing</p>
+                    <h2>{titleForRange(calendarView, selectedDate)}</h2>
+                  </div>
+                  <button className="today-button" onClick={goToToday} type="button">
+                    Today
+                  </button>
+                  <button
+                    aria-label={`Next ${calendarView}`}
+                    className="icon-button"
+                    onClick={() => moveCalendar(1)}
+                    type="button"
+                  >
+                    →
+                  </button>
+                </div>
+
+                {status === "loading" ? (
+                  <div className="loading-rule" role="status"><span /> Loading schedule…</div>
+                ) : null}
+
+                {calendarView === "day" ? (
+                  <div className="day-view">
+                    <div className="section-heading">
+                      <div>
+                        <p className="eyebrow">Agenda</p>
+                        <h2>{fullDateFormatter.format(selectedDate)}</h2>
+                      </div>
+                      <span className="section-count">{selectedEvents.length}</span>
+                    </div>
+                    <EventList
+                      emptyMessage="NO EVENTS SCHEDULED."
+                      events={selectedEvents}
+                      showNotes
+                    />
+                  </div>
+                ) : null}
+
+                {calendarView === "week" ? (
+                  <WeekView
+                    days={weekDays}
+                    onSelectDay={(date) => {
+                      setSelectedDate(date);
+                      setCalendarView("day");
+                    }}
+                  />
+                ) : null}
+
+                {calendarView === "month" ? (
+                  <div className="month-view">
+                    <MonthGrid
+                      days={monthDays}
+                      events={occurrences}
+                      onSelectDay={selectMonthDay}
+                      selectedKey={localDateKey(selectedDate)}
+                    />
+                    <section className="month-selected-day">
+                      <div className="section-heading">
+                        <div>
+                          <p className="eyebrow">Selected day</p>
+                          <h2>{fullDateFormatter.format(selectedDate)}</h2>
+                        </div>
+                        <span className="section-count">{selectedEvents.length}</span>
+                      </div>
+                      <EventList
+                        emptyMessage="NO EVENTS SCHEDULED."
+                        events={selectedEvents}
+                      />
+                    </section>
+                  </div>
+                ) : null}
+              </section>
             </div>
-          ) : (
-            <AgendaView agenda={agenda} />
+          ) : null}
+
+          {activeSection === "settings" ? (
+            <SettingsView
+              calendarView={calendarView}
+              onCalendarViewChange={setCalendarView}
+              source={source}
+              status={status}
+            />
+          ) : null}
+        </main>
+      </div>
+
+      {creatingEvent ? (
+        <CreateEventScreen
+          initialDate={localDateKey(
+            activeSection === "calendar" ? selectedDate : today,
           )}
-        </section>
-        )}
+          onCancel={() => setCreatingEvent(false)}
+          onSave={saveEvent}
+        />
+      ) : null}
 
-        <div className="data-note">
-          <div>
-            <p className="eyebrow">Calendar data</p>
-            <p>
-              {source === "firebase"
-                ? "READING AND WRITING USER-SCOPED EVENTS IN THE VISIBLE RANGE."
-                : "SHOWING SESSION-ONLY SAMPLE AND CREATED EVENTS."}
-            </p>
-          </div>
-          <span>
-            {lastUpdatedAt
-              ? `UPDATED ${lastUpdatedAt.toLocaleTimeString([], {
-                  hour: "numeric",
-                  minute: "2-digit",
-                })}`
-              : fullDateFormatter.format(today)}
-          </span>
-        </div>
-      </main>
-
-      <footer className="site-footer">
-        <span>Simply Schedule</span>
-        <span>Calendar + event workflows · 0.3.0</span>
-      </footer>
+      {profileOpen ? (
+        <ProfilePanel
+          lastUpdatedAt={lastUpdatedAt}
+          onClose={() => setProfileOpen(false)}
+          source={source}
+          status={status}
+        />
+      ) : null}
     </div>
   );
 }

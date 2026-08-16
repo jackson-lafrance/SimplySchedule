@@ -1,17 +1,13 @@
 import type {
   CreateEventInput,
+  RecurrenceFrequency,
   RecurrenceRule,
   RecurrenceTerminationType,
 } from "@/domain/events";
 import { zonedDateTimeToDate } from "@/domain/recurrence";
 
-export type RecurrencePreset =
-  | "none"
-  | "firstOfMonth"
-  | "thirdFriday"
-  | "everyOtherDay"
-  | "everyThreeDays"
-  | "everyFiveHours";
+export type RepeatFrequency = "none" | RecurrenceFrequency;
+export type CalendarPattern = "dayOfMonth" | "ordinalWeekday";
 
 export type EventDraft = {
   title: string;
@@ -20,7 +16,14 @@ export type EventDraft = {
   startTime: string;
   endTime: string;
   allDay: boolean;
-  recurrencePreset: RecurrencePreset;
+  repeatFrequency: RepeatFrequency;
+  interval: string;
+  daysOfWeek: number[];
+  calendarPattern: CalendarPattern;
+  dayOfMonth: string;
+  weekOfMonth: string;
+  ordinalWeekday: string;
+  monthOfYear: string;
   terminationType: RecurrenceTerminationType;
   untilDate: string;
   occurrenceCount: string;
@@ -28,6 +31,23 @@ export type EventDraft = {
 
 const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 const TIME_PATTERN = /^(\d{2}):(\d{2})$/;
+const WEEKDAY_NAMES = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
+const ORDINAL_NAMES: Record<number, string> = {
+  1: "first",
+  2: "second",
+  3: "third",
+  4: "fourth",
+  5: "fifth",
+  [-1]: "last",
+};
 
 function parseDateKey(value: string) {
   const match = DATE_PATTERN.exec(value);
@@ -64,11 +84,10 @@ function parseTime(value: string) {
   return { hour, minute };
 }
 
-function dateKey(year: number, month: number, day: number) {
-  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-}
-
-function addUtcDays(parts: { year: number; month: number; day: number }, days: number) {
+function addUtcDays(
+  parts: { year: number; month: number; day: number },
+  days: number,
+) {
   const date = new Date(Date.UTC(parts.year, parts.month - 1, parts.day + days));
   return {
     year: date.getUTCFullYear(),
@@ -77,72 +96,42 @@ function addUtcDays(parts: { year: number; month: number; day: number }, days: n
   };
 }
 
-function thirdFriday(year: number, month: number) {
-  const firstWeekday = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
-  return 1 + ((5 - firstWeekday + 7) % 7) + 14;
-}
-
-export function alignDateKeyForPreset(
-  value: string,
-  preset: RecurrencePreset,
-) {
-  if (preset !== "firstOfMonth" && preset !== "thirdFriday") {
-    return value;
-  }
-
-  const selected = parseDateKey(value);
-  if (preset === "firstOfMonth") {
-    if (selected.day === 1) {
-      return value;
-    }
-    const nextMonth = new Date(Date.UTC(selected.year, selected.month, 1));
-    return dateKey(
-      nextMonth.getUTCFullYear(),
-      nextMonth.getUTCMonth() + 1,
-      1,
-    );
-  }
-
-  let friday = thirdFriday(selected.year, selected.month);
-  if (selected.day <= friday) {
-    return dateKey(selected.year, selected.month, friday);
-  }
-  const nextMonth = new Date(Date.UTC(selected.year, selected.month, 1));
-  friday = thirdFriday(nextMonth.getUTCFullYear(), nextMonth.getUTCMonth() + 1);
-  return dateKey(
-    nextMonth.getUTCFullYear(),
-    nextMonth.getUTCMonth() + 1,
-    friday,
-  );
-}
-
 function dateAt(
   date: { year: number; month: number; day: number },
   time: { hour: number; minute: number },
   timeZone: string,
 ) {
   return zonedDateTimeToDate(
-    {
-      ...date,
-      ...time,
-      second: 0,
-      millisecond: 0,
-    },
+    { ...date, ...time, second: 0, millisecond: 0 },
     timeZone,
   );
 }
 
-function recurrenceRule(
+function integerField(
+  value: string,
+  label: string,
+  minimum: number,
+  maximum: number,
+  allowLast = false,
+) {
+  const parsed = Number(value);
+  if (
+    !Number.isInteger(parsed) ||
+    (!((allowLast && parsed === -1) || (parsed >= minimum && parsed <= maximum)))
+  ) {
+    throw new Error(`${label} IS NOT VALID.`);
+  }
+  return parsed;
+}
+
+function terminationForDraft(
   draft: EventDraft,
   startsAt: Date,
   timeZone: string,
-): RecurrenceRule | null {
-  if (draft.recurrencePreset === "none") {
-    return null;
-  }
-
+) {
   let until: Date | null = null;
   let count: number | null = null;
+
   if (draft.terminationType === "onDate") {
     const throughDate = parseDateKey(draft.untilDate);
     const nextDate = addUtcDays(throughDate, 1);
@@ -150,46 +139,89 @@ function recurrenceRule(
       dateAt(nextDate, { hour: 0, minute: 0 }, timeZone).getTime() - 1,
     );
     if (until < startsAt) {
-      throw new Error("THE REPEAT END DATE MUST INCLUDE THE FIRST EVENT.");
+      throw new Error("THE REPEAT END DATE MUST INCLUDE THE START ANCHOR.");
     }
   } else if (draft.terminationType === "afterOccurrences") {
-    count = Number(draft.occurrenceCount);
-    if (!Number.isInteger(count) || count < 1 || count > 999) {
-      throw new Error("OCCURRENCES MUST BE A WHOLE NUMBER FROM 1 TO 999.");
-    }
+    count = integerField(draft.occurrenceCount, "OCCURRENCE COUNT", 1, 999);
   }
 
+  return { type: draft.terminationType, until, count };
+}
+
+function recurrenceRule(
+  draft: EventDraft,
+  startsAt: Date,
+  timeZone: string,
+): RecurrenceRule | null {
+  if (draft.repeatFrequency === "none") {
+    return null;
+  }
+
+  const interval = integerField(draft.interval, "REPEAT INTERVAL", 1, 99);
   const common = {
     version: 1 as const,
-    daysOfWeek: null,
-    dayOfMonth: null,
-    weekOfMonth: null,
-    monthOfYear: null,
-    termination: {
-      type: draft.terminationType,
-      until,
-      count,
-    },
+    frequency: draft.repeatFrequency,
+    interval,
+    daysOfWeek: null as number[] | null,
+    dayOfMonth: null as number | null,
+    weekOfMonth: null as number | null,
+    monthOfYear: null as number | null,
+    termination: terminationForDraft(draft, startsAt, timeZone),
   };
 
-  switch (draft.recurrencePreset) {
-    case "firstOfMonth":
-      return { ...common, frequency: "monthly", interval: 1, dayOfMonth: 1 };
-    case "thirdFriday":
+  if (draft.repeatFrequency === "weekly") {
+    const daysOfWeek = [...new Set(draft.daysOfWeek)].sort(
+      (left, right) => left - right,
+    );
+    if (
+      daysOfWeek.length === 0 ||
+      daysOfWeek.some((weekday) => weekday < 0 || weekday > 6)
+    ) {
+      throw new Error("CHOOSE AT LEAST ONE WEEKDAY.");
+    }
+    return { ...common, daysOfWeek };
+  }
+
+  if (
+    draft.repeatFrequency === "monthly" ||
+    draft.repeatFrequency === "yearly"
+  ) {
+    const monthOfYear =
+      draft.repeatFrequency === "yearly"
+        ? integerField(draft.monthOfYear, "MONTH", 1, 12)
+        : null;
+
+    if (draft.calendarPattern === "dayOfMonth") {
       return {
         ...common,
-        frequency: "monthly",
-        interval: 1,
-        daysOfWeek: [5],
-        weekOfMonth: 3,
+        dayOfMonth: integerField(
+          draft.dayOfMonth,
+          "DAY OF MONTH",
+          1,
+          31,
+          true,
+        ),
+        monthOfYear,
       };
-    case "everyOtherDay":
-      return { ...common, frequency: "daily", interval: 2 };
-    case "everyThreeDays":
-      return { ...common, frequency: "daily", interval: 3 };
-    case "everyFiveHours":
-      return { ...common, frequency: "hourly", interval: 5 };
+    }
+
+    return {
+      ...common,
+      daysOfWeek: [
+        integerField(draft.ordinalWeekday, "WEEKDAY", 0, 6),
+      ],
+      weekOfMonth: integerField(
+        draft.weekOfMonth,
+        "WEEK OF MONTH",
+        1,
+        5,
+        true,
+      ),
+      monthOfYear,
+    };
   }
+
+  return common;
 }
 
 export function createEventInputFromDraft(
@@ -212,11 +244,7 @@ export function createEventInputFromDraft(
     throw new Error("THE EVENT TIMEZONE IS NOT AVAILABLE.");
   }
 
-  const alignedDate = alignDateKeyForPreset(
-    draft.date,
-    draft.recurrencePreset,
-  );
-  const selectedDate = parseDateKey(alignedDate);
+  const selectedDate = parseDateKey(draft.date);
   let startsAt: Date;
   let endsAt: Date;
 
@@ -236,7 +264,6 @@ export function createEventInputFromDraft(
   }
 
   const recurrence = recurrenceRule(draft, startsAt, timeZone);
-
   const base = {
     title,
     notes: draft.notes,
@@ -251,19 +278,52 @@ export function createEventInputFromDraft(
     : { ...base, kind: "single", recurrence: null };
 }
 
-export function recurrencePresetSummary(preset: RecurrencePreset) {
-  switch (preset) {
-    case "none":
-      return "DOES NOT REPEAT";
-    case "firstOfMonth":
-      return "FIRST OF EVERY MONTH";
-    case "thirdFriday":
-      return "THIRD FRIDAY OF EVERY MONTH";
-    case "everyOtherDay":
-      return "EVERY OTHER DAY";
-    case "everyThreeDays":
-      return "EVERY THREE DAYS";
-    case "everyFiveHours":
-      return "EVERY FIVE HOURS";
+function unitName(frequency: RecurrenceFrequency, plural: boolean) {
+  const name = frequency === "daily" ? "day" : frequency.replace(/ly$/, "");
+  return plural ? `${name}s` : name;
+}
+
+export function recurrenceSummary(draft: EventDraft) {
+  if (draft.repeatFrequency === "none") {
+    return "DOES NOT REPEAT";
   }
+
+  const interval = Number(draft.interval) || 1;
+  let summary = `EVERY ${interval === 1 ? "" : `${interval} `}${unitName(
+    draft.repeatFrequency,
+    interval !== 1,
+  ).toUpperCase()}`;
+
+  if (draft.repeatFrequency === "weekly" && draft.daysOfWeek.length > 0) {
+    summary += ` ON ${draft.daysOfWeek
+      .map((weekday) => WEEKDAY_NAMES[weekday].slice(0, 3).toUpperCase())
+      .join(", ")}`;
+  }
+
+  if (
+    (draft.repeatFrequency === "monthly" ||
+      draft.repeatFrequency === "yearly") &&
+    draft.calendarPattern === "dayOfMonth"
+  ) {
+    summary += draft.dayOfMonth === "-1"
+      ? " ON THE LAST DAY"
+      : ` ON DAY ${draft.dayOfMonth}`;
+  }
+
+  if (
+    (draft.repeatFrequency === "monthly" ||
+      draft.repeatFrequency === "yearly") &&
+    draft.calendarPattern === "ordinalWeekday"
+  ) {
+    const ordinal = ORDINAL_NAMES[Number(draft.weekOfMonth)] ?? "selected";
+    const weekday = WEEKDAY_NAMES[Number(draft.ordinalWeekday)] ?? "weekday";
+    summary += ` ON THE ${ordinal.toUpperCase()} ${weekday.toUpperCase()}`;
+  }
+
+  return summary;
+}
+
+export function weekdayForDateKey(value: string) {
+  const date = parseDateKey(value);
+  return new Date(Date.UTC(date.year, date.month - 1, date.day)).getUTCDay();
 }

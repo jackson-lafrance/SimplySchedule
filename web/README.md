@@ -1,15 +1,13 @@
 # Simply Schedule web calendar and event workflows
 
-The web client is a Vite/React/TypeScript calendar in the Simply visual language. It provides responsive month and agenda views, an easy event-creation screen, Firebase persistence, and bounded visible-range recurrence expansion.
+The web client is a Vite/React/TypeScript schedule in Simply Lift's restrained visual language. Its information architecture is deliberately small:
 
-The recurrence builder supports:
+- **Home** — today's agenda and the next seven populated days;
+- **Calendar** — uncluttered day, week, and month views;
+- **Settings** — the default view, event timezone, and data status;
+- one persistent **Add event** action and a compact profile/data panel.
 
-- first of every month;
-- third Friday of every month;
-- every other day;
-- every three days;
-- every five hours;
-- never, inclusive through-date, and after-occurrence termination.
+The create sheet starts with title/date/time. Notes and timezone details are progressively disclosed. Recurrence supports arbitrary 1–99 intervals over hours, days, weeks, months, or years; weekday sets; numeric or last month dates; ordinal weekdays such as first Friday; yearly month selectors; independent start anchors; and never, inclusive through-date, or bounded occurrence-count termination.
 
 The canonical web/iOS data model is [`../firebase/CALENDAR_EVENT_CONTRACT.md`](../firebase/CALENDAR_EVENT_CONTRACT.md).
 
@@ -33,7 +31,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Enable Firebase **Anonymous Auth**. The app signs in (or reuses the browser's anonymous session), reads only event candidates for the current six-week calendar range, and writes canonical documents under:
+Enable Firebase **Anonymous Auth**. The app signs in (or reuses the browser's anonymous session), reads only event candidates for the active Home/day/week/month range, and writes canonical documents under:
 
 ```text
 users/{uid}/events/{eventId}
@@ -83,15 +81,15 @@ Set the `VITE_FIREBASE_*` values above and `FIREBASE_E2E=true` while running Pla
 ## Structure
 
 - `src/domain/events.ts` — canonical event, recurrence, occurrence, and visible-range types.
-- `src/domain/eventForm.ts` — form normalization, preset encoding, first-occurrence alignment, and validation.
+- `src/domain/eventForm.ts` — expressive rule normalization, summaries, anchor semantics, and validation.
 - `src/domain/recurrence.ts` — timezone-aware, capped range expansion and stable occurrence keys.
 - `src/domain/calendar.ts` — date-grid navigation, sorting, day intersection, and agenda projection.
 - `src/lib/firebase.ts` — Vite environment validation, Firebase initialization, emulator connections, and anonymous auth.
 - `src/services/eventRepository.ts` — Firestore conversion, strict runtime decoding, visible-range listeners, canonical writes, and emulator seeding.
 - `src/context/` — canonical schedule state, visible-range subscription lifecycle, and create actions.
-- `src/components/` — month grid, agenda, event list, and create-event screen.
+- `src/components/` — Home, day/week/month projections, Settings, profile panel, event list, and progressive create sheet.
 - `e2e/calendar.spec.ts` — Chromium navigation plus create/expand/persist acceptance flows.
 
 ## Semantics
 
-Calendar ranges are half-open. Month reads and expansion use the full six-week grid. Daily/monthly/yearly rules preserve the event timezone's wall clock across offset changes; hourly rules use elapsed-hour intervals. `onDate` is stored as an inclusive timestamp through the selected local day, and `afterOccurrences` includes the first occurrence. Expansion emits at most 2,000 occurrences per projection and keeps each calculated occurrence out of Firestore.
+Calendar ranges are half-open: Home uses seven days, day uses one, week uses seven from Sunday, and month uses the full six-week grid. Daily/weekly/monthly/yearly rules preserve the event timezone's wall clock across offset changes; hourly rules use elapsed-hour intervals. `startsAt` is the recurrence anchor/lower bound, selector-based rules begin at their first match on or after it, `onDate` includes the selected local day, and `afterOccurrences` includes the first matching occurrence. Expansion emits at most 2,000 occurrences per projection and keeps each calculated occurrence out of Firestore.

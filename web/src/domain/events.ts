@@ -94,4 +94,4 @@ export type VisibleRange = {
   end: Date;
 };
 
-export type CalendarView = "month" | "agenda";
+export type CalendarView = "day" | "week" | "month";

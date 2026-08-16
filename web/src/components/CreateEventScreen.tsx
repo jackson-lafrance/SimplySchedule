@@ -1,19 +1,37 @@
 import { useState, type FormEvent } from "react";
 
 import {
-  alignDateKeyForPreset,
   createEventInputFromDraft,
-  recurrencePresetSummary,
+  recurrenceSummary,
+  weekdayForDateKey,
+  type CalendarPattern,
   type EventDraft,
-  type RecurrencePreset,
+  type RepeatFrequency,
 } from "@/domain/eventForm";
 import type { CreateEventInput, RecurrenceTerminationType } from "@/domain/events";
+
+const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
+const MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
 
 function browserTimeZone() {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 }
 
 function initialDraft(date: string): EventDraft {
+  const [, month, day] = date.split("-").map(Number);
   return {
     title: "",
     notes: "",
@@ -21,7 +39,14 @@ function initialDraft(date: string): EventDraft {
     startTime: "09:00",
     endTime: "10:00",
     allDay: false,
-    recurrencePreset: "none",
+    repeatFrequency: "none",
+    interval: "1",
+    daysOfWeek: [weekdayForDateKey(date)],
+    calendarPattern: "dayOfMonth",
+    dayOfMonth: String(day),
+    weekOfMonth: "1",
+    ordinalWeekday: String(weekdayForDateKey(date)),
+    monthOfYear: String(month),
     terminationType: "never",
     untilDate: date,
     occurrenceCount: "10",
@@ -38,6 +63,7 @@ export default function CreateEventScreen({
   onSave: (event: CreateEventInput) => Promise<void>;
 }) {
   const [draft, setDraft] = useState(() => initialDraft(initialDate));
+  const [showMore, setShowMore] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const timeZone = browserTimeZone();
@@ -47,30 +73,21 @@ export default function CreateEventScreen({
     value: EventDraft[Field],
   ) => setDraft((current) => ({ ...current, [field]: value }));
 
-  const selectRecurrence = (preset: RecurrencePreset) => {
-    setDraft((current) => {
-      const date = alignDateKeyForPreset(current.date, preset);
-      return {
-        ...current,
-        recurrencePreset: preset,
-        date,
-        untilDate: current.untilDate < date ? date : current.untilDate,
-      };
-    });
+  const selectDate = (date: string) => {
+    setDraft((current) => ({
+      ...current,
+      date,
+      untilDate: current.untilDate < date ? date : current.untilDate,
+    }));
   };
 
-  const selectDate = (selectedDate: string) => {
-    setDraft((current) => {
-      const date = alignDateKeyForPreset(
-        selectedDate,
-        current.recurrencePreset,
-      );
-      return {
-        ...current,
-        date,
-        untilDate: current.untilDate < date ? date : current.untilDate,
-      };
-    });
+  const toggleWeekday = (weekday: number) => {
+    setDraft((current) => ({
+      ...current,
+      daysOfWeek: current.daysOfWeek.includes(weekday)
+        ? current.daysOfWeek.filter((item) => item !== weekday)
+        : [...current.daysOfWeek, weekday].sort((left, right) => left - right),
+    }));
   };
 
   const submit = async (formEvent: FormEvent<HTMLFormElement>) => {
@@ -91,182 +108,356 @@ export default function CreateEventScreen({
     }
   };
 
-  const repeats = draft.recurrencePreset !== "none";
+  const repeats = draft.repeatFrequency !== "none";
+  const usesCalendarPattern =
+    draft.repeatFrequency === "monthly" ||
+    draft.repeatFrequency === "yearly";
 
   return (
-    <section className="create-event-screen" aria-labelledby="create-event-title">
-      <div className="create-event-heading">
-        <div>
-          <p className="eyebrow">New schedule entry</p>
-          <h2 id="create-event-title">Event details</h2>
-        </div>
-        <span className="timezone-label">{timeZone}</span>
-      </div>
-
-      <form className="event-form" onSubmit={submit}>
-        <div className="form-section form-section-primary">
-          <label className="form-field form-field-wide">
-            <span>Title</span>
-            <input
-              autoFocus
-              maxLength={200}
-              onChange={(event) => update("title", event.target.value)}
-              placeholder="WHAT IS HAPPENING?"
-              required
-              type="text"
-              value={draft.title}
-            />
-          </label>
-          <label className="form-field form-field-wide">
-            <span>Notes <em>Optional</em></span>
-            <textarea
-              maxLength={5_000}
-              onChange={(event) => update("notes", event.target.value)}
-              placeholder="ADD THE USEFUL DETAILS."
-              rows={3}
-              value={draft.notes}
-            />
-          </label>
-        </div>
-
-        <fieldset className="form-section">
-          <legend>When</legend>
-          <label className="form-field">
-            <span>First occurrence</span>
-            <input
-              onChange={(event) => selectDate(event.target.value)}
-              required
-              type="date"
-              value={draft.date}
-            />
-          </label>
-          <label className="check-field">
-            <input
-              checked={draft.allDay}
-              onChange={(event) => update("allDay", event.target.checked)}
-              type="checkbox"
-            />
-            <span>ALL DAY</span>
-          </label>
-          {!draft.allDay ? (
-            <div className="time-fields">
-              <label className="form-field">
-                <span>Starts</span>
-                <input
-                  onChange={(event) => update("startTime", event.target.value)}
-                  required
-                  type="time"
-                  value={draft.startTime}
-                />
-              </label>
-              <label className="form-field">
-                <span>Ends</span>
-                <input
-                  onChange={(event) => update("endTime", event.target.value)}
-                  required
-                  type="time"
-                  value={draft.endTime}
-                />
-              </label>
-            </div>
-          ) : null}
-        </fieldset>
-
-        <fieldset className="form-section repeat-section">
-          <legend>Repeat</legend>
-          <label className="form-field form-field-wide">
-            <span>Pattern</span>
-            <select
-              aria-label="Repeat pattern"
-              onChange={(event) =>
-                selectRecurrence(event.target.value as RecurrencePreset)
-              }
-              value={draft.recurrencePreset}
-            >
-              <option value="none">Does not repeat</option>
-              <option value="firstOfMonth">First of every month</option>
-              <option value="thirdFriday">Third Friday of every month</option>
-              <option value="everyOtherDay">Every other day</option>
-              <option value="everyThreeDays">Every three days</option>
-              <option value="everyFiveHours">Every five hours</option>
-            </select>
-          </label>
-
-          {repeats ? (
-            <>
-              <div className="repeat-summary" role="status">
-                <span aria-hidden="true">↻</span>
-                <div>
-                  <strong>{recurrencePresetSummary(draft.recurrencePreset)}</strong>
-                  <small>Occurrences are calculated only for the calendar range you view.</small>
-                </div>
-              </div>
-              <label className="form-field">
-                <span>Ends</span>
-                <select
-                  aria-label="Repeat ends"
-                  onChange={(event) =>
-                    update(
-                      "terminationType",
-                      event.target.value as RecurrenceTerminationType,
-                    )
-                  }
-                  value={draft.terminationType}
-                >
-                  <option value="never">Never</option>
-                  <option value="onDate">On a date</option>
-                  <option value="afterOccurrences">After occurrences</option>
-                </select>
-              </label>
-              {draft.terminationType === "onDate" ? (
-                <label className="form-field">
-                  <span>Through date</span>
-                  <input
-                    min={draft.date}
-                    onChange={(event) => update("untilDate", event.target.value)}
-                    required
-                    type="date"
-                    value={draft.untilDate}
-                  />
-                </label>
-              ) : null}
-              {draft.terminationType === "afterOccurrences" ? (
-                <label className="form-field">
-                  <span>Occurrences</span>
-                  <input
-                    max={999}
-                    min={1}
-                    onChange={(event) =>
-                      update("occurrenceCount", event.target.value)
-                    }
-                    required
-                    type="number"
-                    value={draft.occurrenceCount}
-                  />
-                </label>
-              ) : null}
-            </>
-          ) : null}
-        </fieldset>
-
-        {errorMessage ? (
-          <div className="form-error" role="alert">{errorMessage}</div>
-        ) : null}
-
-        <div className="form-actions">
+    <div className="sheet-overlay" role="presentation">
+      <section
+        aria-labelledby="create-event-title"
+        aria-modal="true"
+        className="create-event-sheet"
+        role="dialog"
+      >
+        <div className="sheet-header">
+          <div>
+            <p className="eyebrow">New schedule entry</p>
+            <h2 id="create-event-title">New event</h2>
+          </div>
           <button
-            className="outline-button"
+            aria-label="Close event editor"
+            className="plain-icon-button"
             disabled={saving}
             onClick={onCancel}
             type="button"
           >
-            Cancel
-          </button>
-          <button className="primary-button" disabled={saving} type="submit">
-            {saving ? "Saving…" : "Save event"}
+            ×
           </button>
         </div>
-      </form>
-    </section>
+
+        <form className="event-form" onSubmit={submit}>
+          <div className="form-scroll">
+            <label className="form-field form-field-wide title-field">
+              <span>Title</span>
+              <input
+                autoFocus
+                maxLength={200}
+                onChange={(event) => update("title", event.target.value)}
+                placeholder="WHAT IS HAPPENING?"
+                required
+                type="text"
+                value={draft.title}
+              />
+            </label>
+
+            <div className="quick-fields">
+              <label className="form-field">
+                <span>Start anchor</span>
+                <input
+                  onChange={(event) => selectDate(event.target.value)}
+                  required
+                  type="date"
+                  value={draft.date}
+                />
+              </label>
+              <label className="toggle-field">
+                <input
+                  checked={draft.allDay}
+                  onChange={(event) => update("allDay", event.target.checked)}
+                  type="checkbox"
+                />
+                <span>All day</span>
+              </label>
+            </div>
+
+            {!draft.allDay ? (
+              <div className="quick-fields">
+                <label className="form-field">
+                  <span>Starts</span>
+                  <input
+                    onChange={(event) => update("startTime", event.target.value)}
+                    required
+                    type="time"
+                    value={draft.startTime}
+                  />
+                </label>
+                <label className="form-field">
+                  <span>Ends</span>
+                  <input
+                    onChange={(event) => update("endTime", event.target.value)}
+                    required
+                    type="time"
+                    value={draft.endTime}
+                  />
+                </label>
+              </div>
+            ) : null}
+
+            <section className="repeat-builder" aria-labelledby="repeat-title">
+              <div className="form-section-heading">
+                <div>
+                  <p className="eyebrow">Optional</p>
+                  <h3 id="repeat-title">Repeat</h3>
+                </div>
+                {repeats ? <span className="repeat-glyph">↻</span> : null}
+              </div>
+
+              <div className="repeat-frequency-row">
+                {repeats ? (
+                  <label className="form-field interval-field">
+                    <span>Every</span>
+                    <input
+                      aria-label="Repeat interval"
+                      max={99}
+                      min={1}
+                      onChange={(event) => update("interval", event.target.value)}
+                      type="number"
+                      value={draft.interval}
+                    />
+                  </label>
+                ) : null}
+                <label className="form-field form-field-wide">
+                  <span>{repeats ? "Unit" : "Pattern"}</span>
+                  <select
+                    aria-label="Repeat unit"
+                    onChange={(event) =>
+                      update(
+                        "repeatFrequency",
+                        event.target.value as RepeatFrequency,
+                      )
+                    }
+                    value={draft.repeatFrequency}
+                  >
+                    <option value="none">Does not repeat</option>
+                    <option value="hourly">Hour(s)</option>
+                    <option value="daily">Day(s)</option>
+                    <option value="weekly">Week(s)</option>
+                    <option value="monthly">Month(s)</option>
+                    <option value="yearly">Year(s)</option>
+                  </select>
+                </label>
+              </div>
+
+              {draft.repeatFrequency === "weekly" ? (
+                <fieldset className="weekday-picker">
+                  <legend>On weekdays</legend>
+                  <div>
+                    {WEEKDAYS.map((label, weekday) => (
+                      <label key={`${label}-${weekday}`}>
+                        <input
+                          checked={draft.daysOfWeek.includes(weekday)}
+                          onChange={() => toggleWeekday(weekday)}
+                          type="checkbox"
+                        />
+                        <span>{label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+              ) : null}
+
+              {usesCalendarPattern ? (
+                <div className="calendar-rule-fields">
+                  {draft.repeatFrequency === "yearly" ? (
+                    <label className="form-field">
+                      <span>Month</span>
+                      <select
+                        onChange={(event) =>
+                          update("monthOfYear", event.target.value)
+                        }
+                        value={draft.monthOfYear}
+                      >
+                        {MONTHS.map((month, index) => (
+                          <option key={month} value={index + 1}>{month}</option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
+                  <label className="form-field">
+                    <span>Monthly pattern</span>
+                    <select
+                      onChange={(event) =>
+                        update(
+                          "calendarPattern",
+                          event.target.value as CalendarPattern,
+                        )
+                      }
+                      value={draft.calendarPattern}
+                    >
+                      <option value="dayOfMonth">Date of month</option>
+                      <option value="ordinalWeekday">Ordinal weekday</option>
+                    </select>
+                  </label>
+                  {draft.calendarPattern === "dayOfMonth" ? (
+                    <label className="form-field">
+                      <span>Date</span>
+                      <select
+                        aria-label="Day of month"
+                        onChange={(event) =>
+                          update("dayOfMonth", event.target.value)
+                        }
+                        value={draft.dayOfMonth}
+                      >
+                        {Array.from({ length: 31 }, (_, index) => (
+                          <option key={index + 1} value={index + 1}>{index + 1}</option>
+                        ))}
+                        <option value="-1">Last day</option>
+                      </select>
+                    </label>
+                  ) : (
+                    <>
+                      <label className="form-field">
+                        <span>Which</span>
+                        <select
+                          aria-label="Week of month"
+                          onChange={(event) =>
+                            update("weekOfMonth", event.target.value)
+                          }
+                          value={draft.weekOfMonth}
+                        >
+                          <option value="1">First</option>
+                          <option value="2">Second</option>
+                          <option value="3">Third</option>
+                          <option value="4">Fourth</option>
+                          <option value="5">Fifth</option>
+                          <option value="-1">Last</option>
+                        </select>
+                      </label>
+                      <label className="form-field">
+                        <span>Weekday</span>
+                        <select
+                          aria-label="Ordinal weekday"
+                          onChange={(event) =>
+                            update("ordinalWeekday", event.target.value)
+                          }
+                          value={draft.ordinalWeekday}
+                        >
+                          {[
+                            "Sunday",
+                            "Monday",
+                            "Tuesday",
+                            "Wednesday",
+                            "Thursday",
+                            "Friday",
+                            "Saturday",
+                          ].map((weekday, index) => (
+                            <option key={weekday} value={index}>{weekday}</option>
+                          ))}
+                        </select>
+                      </label>
+                    </>
+                  )}
+                </div>
+              ) : null}
+
+              {repeats ? (
+                <>
+                  <div className="repeat-summary" role="status">
+                    <strong>{recurrenceSummary(draft)}</strong>
+                    <small>Anchored {draft.date} · {timeZone}</small>
+                  </div>
+                  <div className="termination-fields">
+                    <label className="form-field">
+                      <span>Ends</span>
+                      <select
+                        aria-label="Repeat ends"
+                        onChange={(event) =>
+                          update(
+                            "terminationType",
+                            event.target.value as RecurrenceTerminationType,
+                          )
+                        }
+                        value={draft.terminationType}
+                      >
+                        <option value="never">Never</option>
+                        <option value="onDate">On a date</option>
+                        <option value="afterOccurrences">After count</option>
+                      </select>
+                    </label>
+                    {draft.terminationType === "onDate" ? (
+                      <label className="form-field">
+                        <span>Through date</span>
+                        <input
+                          min={draft.date}
+                          onChange={(event) =>
+                            update("untilDate", event.target.value)
+                          }
+                          required
+                          type="date"
+                          value={draft.untilDate}
+                        />
+                      </label>
+                    ) : null}
+                    {draft.terminationType === "afterOccurrences" ? (
+                      <label className="form-field">
+                        <span>Occurrences</span>
+                        <input
+                          max={999}
+                          min={1}
+                          onChange={(event) =>
+                            update("occurrenceCount", event.target.value)
+                          }
+                          required
+                          type="number"
+                          value={draft.occurrenceCount}
+                        />
+                      </label>
+                    ) : null}
+                  </div>
+                </>
+              ) : null}
+            </section>
+
+            <button
+              aria-expanded={showMore}
+              className="disclosure-button"
+              onClick={() => setShowMore((current) => !current)}
+              type="button"
+            >
+              {showMore ? "− Fewer details" : "+ More details"}
+            </button>
+
+            {showMore ? (
+              <section className="optional-details">
+                <label className="form-field form-field-wide">
+                  <span>Notes</span>
+                  <textarea
+                    maxLength={5_000}
+                    onChange={(event) => update("notes", event.target.value)}
+                    placeholder="ADD THE USEFUL DETAILS."
+                    rows={3}
+                    value={draft.notes}
+                  />
+                </label>
+                <p className="timezone-note">
+                  <strong>TIMEZONE</strong>
+                  <span>{timeZone}. Calendar recurrence stays at local wall time across DST.</span>
+                </p>
+              </section>
+            ) : null}
+
+            {errorMessage ? (
+              <div className="form-error" role="alert">{errorMessage}</div>
+            ) : null}
+          </div>
+
+          <div className="form-actions">
+            <button
+              className="outline-button"
+              disabled={saving}
+              onClick={onCancel}
+              type="button"
+            >
+              Cancel
+            </button>
+            <button className="primary-button" disabled={saving} type="submit">
+              {saving ? "Saving…" : "Save event"}
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
   );
 }
