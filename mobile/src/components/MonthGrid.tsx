@@ -2,83 +2,80 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import {
   eventsForDate,
+  tasksForDate,
   type CalendarDay,
 } from "@/domain/calendar";
 import type { EventOccurrence } from "@/domain/events";
+import type { WeekStart } from "@/domain/preferences";
+import type { ScheduleTask } from "@/domain/tasks";
 import { colors, radii, spacing, typography } from "@/theme";
 
-const WEEKDAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
 const accessibilityDateFormatter = new Intl.DateTimeFormat("en-US", {
-  day: "numeric",
-  month: "long",
   weekday: "long",
+  month: "long",
+  day: "numeric",
   year: "numeric",
 });
 
 export default function MonthGrid({
   days,
   events,
+  tasks,
   selectedKey,
+  weekStartsOn,
   onSelectDay,
 }: {
   days: CalendarDay[];
   events: EventOccurrence[];
+  tasks: ScheduleTask[];
   selectedKey: string;
+  weekStartsOn: WeekStart;
   onSelectDay: (day: CalendarDay) => void;
 }) {
+  const weekdays = weekStartsOn === 0
+    ? WEEKDAYS
+    : [...WEEKDAYS.slice(1), WEEKDAYS[0]];
   return (
     <View>
-      <View accessibilityRole="header" style={styles.weekdays}>
-        {WEEKDAYS.map((weekday) => (
-          <Text key={weekday} style={styles.weekday}>
-            {weekday.slice(0, 1)}
+      <View style={styles.weekdays}>
+        {weekdays.map((day, index) => (
+          <Text key={`${day}-${index}`} style={styles.weekday}>
+            {day}
           </Text>
         ))}
       </View>
-
       <View style={styles.grid}>
-        {days.map((day, index) => {
-          const eventCount = eventsForDate(events, day.date).length;
-          const isSelected = day.key === selectedKey;
-
+        {days.map((day) => {
+          const count =
+            eventsForDate(events, day.date).length +
+            tasksForDate(tasks, day.date).length;
+          const selected = day.key === selectedKey;
           return (
             <Pressable
-              accessibilityLabel={`${accessibilityDateFormatter.format(day.date)}, ${eventCount} ${eventCount === 1 ? "event" : "events"}`}
+              accessibilityLabel={`${accessibilityDateFormatter.format(day.date)}, ${count} items`}
               accessibilityRole="button"
-              accessibilityState={{ selected: isSelected }}
-              hitSlop={2}
+              accessibilityState={{ selected }}
               key={day.key}
               onPress={() => onSelectDay(day)}
               style={({ pressed }) => [
                 styles.day,
-                index % 7 === 6 && styles.lastColumn,
-                index >= 35 && styles.lastRow,
-                isSelected && styles.selectedDay,
-                day.isToday && !isSelected && styles.today,
-                pressed && styles.pressedDay,
+                selected && styles.selected,
+                day.isToday && !selected && styles.today,
+                pressed && styles.pressed,
               ]}
             >
               <Text
                 style={[
                   styles.dayNumber,
-                  !day.isCurrentMonth && styles.outsideNumber,
-                  isSelected && styles.selectedNumber,
+                  !day.isCurrentMonth && styles.outside,
+                  selected && styles.selectedText,
                 ]}
               >
                 {day.dayNumber}
               </Text>
-              {eventCount > 0 ? (
-                <View style={styles.dots}>
-                  {Array.from({ length: Math.min(eventCount, 3) }, (_, dot) => (
-                    <View
-                      key={dot}
-                      style={[
-                        styles.dot,
-                        isSelected && styles.selectedDot,
-                      ]}
-                    />
-                  ))}
-                </View>
+              {count > 0 ? (
+                <View style={[styles.dot, selected && styles.selectedDot]} />
               ) : null}
             </Pressable>
           );
@@ -91,7 +88,6 @@ export default function MonthGrid({
 const styles = StyleSheet.create({
   weekdays: {
     flexDirection: "row",
-    paddingHorizontal: spacing.xxs,
     marginBottom: spacing.xs,
   },
   weekday: {
@@ -106,57 +102,44 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.ink,
     borderRadius: radii.card,
+    paddingVertical: spacing.xxs,
     overflow: "hidden",
   },
   day: {
     flexBasis: "14.285714%",
-    height: 48,
+    height: 44,
     alignItems: "center",
     justifyContent: "center",
-    borderRightWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: colors.divider,
-    backgroundColor: colors.background,
+    borderRadius: 6,
   },
-  lastColumn: {
-    borderRightWidth: 0,
-  },
-  lastRow: {
-    borderBottomWidth: 0,
-  },
-  selectedDay: {
+  selected: {
     backgroundColor: colors.ink,
   },
   today: {
-    backgroundColor: "#EEEDFF",
+    backgroundColor: colors.surfaceMuted,
   },
-  pressedDay: {
+  pressed: {
     opacity: 0.6,
   },
   dayNumber: {
+    color: colors.ink,
     fontSize: 13,
     fontWeight: "900",
-    color: colors.ink,
   },
-  outsideNumber: {
+  outside: {
     color: colors.muted,
   },
-  selectedNumber: {
+  selectedText: {
     color: colors.inverse,
-  },
-  dots: {
-    flexDirection: "row",
-    gap: 2,
-    height: 5,
-    marginTop: 3,
   },
   dot: {
     width: 4,
     height: 4,
-    borderRadius: radii.pill,
-    backgroundColor: colors.accent,
+    borderRadius: 2,
+    marginTop: 2,
+    backgroundColor: colors.ink,
   },
   selectedDot: {
-    backgroundColor: colors.inverse,
+    backgroundColor: colors.success,
   },
 });

@@ -16,10 +16,16 @@ import {
 
 import type { CreateEventInput, RecurrenceRule } from "@/domain/events";
 import { expandEventsInRange } from "@/domain/recurrence";
+import type { ScheduleTask } from "@/domain/tasks";
 import {
   createEvent,
   subscribeToEventsInRange,
 } from "@/services/eventRepository";
+import {
+  completeTask,
+  createTask,
+  subscribeToTasksInRange,
+} from "@/services/taskRepository";
 
 const emulatorHost = process.env.FIRESTORE_EMULATOR_HOST?.split(":")[0] ??
   "127.0.0.1";
@@ -81,7 +87,7 @@ function single(
   };
 }
 
-test("creates canonical events and projects recurrence through shared emulators", async () => {
+test("persists tasks and flexible events through shared emulators", async () => {
   const app = initializeApp(
     {
       apiKey: "demo-api-key",
@@ -129,6 +135,15 @@ test("creates canonical events and projects recurrence through shared emulators"
         "Every five hours",
         "2026-08-11T00:00:00.000Z",
         recurrence({ frequency: "hourly", interval: 5 }),
+      ),
+      repeating(
+        "Monday and Friday",
+        "2026-08-14T09:00:00.000Z",
+        recurrence({
+          frequency: "weekly",
+          interval: 2,
+          daysOfWeek: [1, 5],
+        }),
       ),
       single("Point event", "2026-08-11T13:00:00.000Z", null),
       single(
@@ -199,6 +214,58 @@ test("creates canonical events and projects recurrence through shared emulators"
 
     assert.equal(candidates.length, inputs.length);
     assert.ok(candidates.some((event) => event.title === "Overlapping duration"));
+
+    const taskId = await createTask(db, user.uid, {
+      title: "Send emulator agenda",
+      notes: "Task persistence proof.",
+      dueAt: new Date("2026-08-11T16:30:00.000Z"),
+    });
+    const visibleTasks = await new Promise<ScheduleTask[]>((resolve, reject) => {
+      let unsubscribe: (() => void) | undefined;
+      const timeout = setTimeout(() => {
+        unsubscribe?.();
+        reject(new Error("Timed out waiting for task snapshots."));
+      }, 10_000);
+      unsubscribe = subscribeToTasksInRange(
+        db,
+        user.uid,
+        range,
+        (tasks) => {
+          if (tasks.some((task) => task.id === taskId)) {
+            clearTimeout(timeout);
+            unsubscribe?.();
+            resolve(tasks);
+          }
+        },
+        (error) => {
+          clearTimeout(timeout);
+          unsubscribe?.();
+          reject(error);
+        },
+      );
+    });
+    assert.equal(visibleTasks.find((task) => task.id === taskId)?.status, "open");
+    const persistedTasks = await getDocs(
+      collection(db, "users", user.uid, "tasks"),
+    );
+    assert.equal(persistedTasks.size, 1);
+    assert.deepEqual(Object.keys(persistedTasks.docs[0].data()).sort(), [
+      "completedAt",
+      "createdAt",
+      "dueAt",
+      "notes",
+      "parentId",
+      "position",
+      "status",
+      "title",
+      "updatedAt",
+    ]);
+    await completeTask(db, user.uid, taskId);
+    const completedTasks = await getDocs(
+      collection(db, "users", user.uid, "tasks"),
+    );
+    assert.equal(completedTasks.docs[0].data().status, "completed");
+    assert.ok(completedTasks.docs[0].data().completedAt instanceof Timestamp);
 
     const proofDay = {
       start: new Date("2026-08-11T00:00:00.000Z"),

@@ -10,9 +10,14 @@ import {
   getMonthDays,
   localDateKey,
   startOfMonth,
+  startOfWeek,
+  tasksForDate,
+  visibleRangeForDay,
   visibleRangeForMonth,
+  visibleRangeForWeek,
 } from "@/domain/calendar";
 import type { EventOccurrence } from "@/domain/events";
+import type { ScheduleTask } from "@/domain/tasks";
 
 function occurrence(
   overrides: Partial<EventOccurrence> = {},
@@ -52,6 +57,20 @@ test("uses the displayed six-week grid as a half-open visible range", () => {
   assert.equal(localDateKey(range.end), "2026-09-06");
   assert.equal(range.start.getHours(), 0);
   assert.equal(range.end.getHours(), 0);
+});
+
+test("derives day and configurable week ranges", () => {
+  const date = new Date(2026, 7, 12, 12);
+  const day = visibleRangeForDay(date);
+  const mondayWeek = visibleRangeForWeek(date, 1);
+  const sundayWeek = visibleRangeForWeek(date, 0);
+
+  assert.equal(localDateKey(day.start), "2026-08-12");
+  assert.equal(localDateKey(day.end), "2026-08-13");
+  assert.equal(localDateKey(startOfWeek(date, 1)), "2026-08-10");
+  assert.equal(localDateKey(mondayWeek.start), "2026-08-10");
+  assert.equal(localDateKey(mondayWeek.end), "2026-08-17");
+  assert.equal(localDateKey(sundayWeek.start), "2026-08-09");
 });
 
 test("month navigation always lands on the first day", () => {
@@ -108,6 +127,37 @@ test("sorts all-day entries before timed and repeating occurrences", () => {
   assert.deepEqual(
     eventsForDate(events, new Date(2026, 7, 11, 12)).map((event) => event.id),
     ["all-day", "repeat@2026-08-11", "timed"],
+  );
+});
+
+test("projects only open due tasks onto their agenda day", () => {
+  const createdAt = new Date(2026, 7, 1, 9);
+  const task = (
+    overrides: Partial<ScheduleTask> = {},
+  ): ScheduleTask => ({
+    id: "task-1",
+    title: "Task",
+    notes: "",
+    status: "open",
+    parentId: null,
+    dueAt: new Date(2026, 7, 11, 11),
+    completedAt: null,
+    position: 1,
+    createdAt,
+    updatedAt: createdAt,
+    ...overrides,
+  });
+
+  assert.deepEqual(
+    tasksForDate(
+      [
+        task(),
+        task({ id: "tomorrow", dueAt: new Date(2026, 7, 12, 9) }),
+        task({ id: "done", status: "completed" }),
+      ],
+      new Date(2026, 7, 11, 12),
+    ).map((item) => item.id),
+    ["task-1"],
   );
 });
 

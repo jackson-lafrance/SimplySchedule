@@ -107,6 +107,8 @@ Termination semantics:
 
 Each example also includes `version: 1` and a complete `termination` map in Firestore.
 
+The iOS recurrence builder exposes the full version 1 grammar rather than limiting creation to these examples: arbitrary intervals, multi-weekday weekly rules, numeric or ordinal monthly/yearly selectors, yearly month selection, and every bounded termination type. Its selected date/time is a start anchor; canonical `startsAt` advances to the first selector match so it remains the actual first occurrence.
+
 ## Query and projection contract
 
 Each platform repository uses the displayed six-week range `[rangeStart, rangeEnd)` and combines three user-scoped listeners:

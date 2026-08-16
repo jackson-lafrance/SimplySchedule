@@ -12,7 +12,7 @@ npm install
 npm run ios
 ```
 
-The iPhone client provides month and agenda views, a Simply-styled timed/all-day event form, canonical user-scoped Firebase writes, visible six-week range reads, and bounded recurrence for first-of-month, third-Friday, two-day, three-day, and five-hour schedules. Local preview creation remains session-only.
+The iPhone client uses SimplyLift's shelf, profile, navigation, typography, spacing, and primary-action patterns. Its three tabs provide a minimal selected-day agenda, restrained day/week/month calendars, and three focused preferences. A single quick-add sheet creates canonical tasks or events and exposes arbitrary interval, weekday, numeric-day, ordinal-weekday, yearly, timezone-aware, and bounded recurrence only when requested. Local preview creation remains session-only.
 
 ## Web
 

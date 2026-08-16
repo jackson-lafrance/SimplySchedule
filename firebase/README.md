@@ -34,7 +34,7 @@ No service-account credentials or production secrets belong in this repository. 
 - [`../mobile/.env.example`](../mobile/.env.example) for Expo (`EXPO_PUBLIC_FIREBASE_*`).
 - [`../web/.env.example`](../web/.env.example) for Vite (`VITE_FIREBASE_*`).
 
-The React web and React Native iOS clients are wired to this boundary for visible-range calendar reads, canonical event creation, and bounded local recurrence expansion.
+The React web and React Native iOS clients use this boundary for visible-range calendar reads, canonical event creation, and bounded local recurrence expansion. iOS also creates, lists, and completes canonical due tasks.
 
 ## Initial Firestore shape
 
@@ -61,7 +61,7 @@ A task document has the following fields:
 | `position` | number | Ordering value within a task list or sibling group. |
 | `createdAt` / `updatedAt` | timestamp | Server-managed lifecycle timestamps. |
 
-Subtasks stay in the same collection so list and calendar queries share one repository. The initial rules verify ownership and shape but cannot prove that `parentId` exists or prevent cycles; mutations that alter a hierarchy should use a transaction in the client repository.
+Subtasks stay in the same collection so list and calendar queries share one repository. The iOS agenda queries open tasks by the visible `dueAt` range, creates top-level tasks with `parentId: null`, and uses server timestamps when completing them. The rules verify ownership and shape but cannot prove that `parentId` exists or prevent cycles; mutations that alter a hierarchy should use a transaction in the client repository.
 
 ### Single and repeating events
 
@@ -84,4 +84,4 @@ Not included yet:
 - Event editing/deletion, account screens, or an offline outbox.
 - Occurrence exceptions, task hierarchy mutation logic, reminders, or Cloud Functions.
 
-Both clients initialize Firebase when their platform environment is complete, authenticate an anonymous user, subscribe to user-scoped visible-range event candidates, write exact canonical event documents with server lifecycle timestamps, and expand recurrence locally. See [`../web/README.md`](../web/README.md) and [`../mobile/README.md`](../mobile/README.md) for run instructions.
+Both clients initialize Firebase when their platform environment is complete, authenticate an anonymous user, subscribe to user-scoped visible-range event candidates, write exact canonical event documents with server lifecycle timestamps, and expand recurrence locally. iOS additionally subscribes to due tasks and performs canonical task creation/completion. See [`../web/README.md`](../web/README.md) and [`../mobile/README.md`](../mobile/README.md) for run instructions.

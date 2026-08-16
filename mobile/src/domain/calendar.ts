@@ -1,4 +1,5 @@
 import type { EventOccurrence, VisibleRange } from "@/domain/events";
+import type { ScheduleTask } from "@/domain/tasks";
 
 export const WEEK_STARTS_ON = 0;
 export const DAYS_IN_MONTH_GRID = 42;
@@ -64,12 +65,51 @@ export function dateKeyInTimeZone(date: Date, timeZone: string) {
     : localDateKey(date);
 }
 
+export function atLocalNoon(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12);
+}
+
+export function addDays(date: Date, amount: number) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + amount, 12);
+}
+
 export function startOfMonth(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), 1, 12);
 }
 
 export function addMonths(date: Date, amount: number) {
   return new Date(date.getFullYear(), date.getMonth() + amount, 1, 12);
+}
+
+export function startOfWeek(date: Date, weekStartsOn = WEEK_STARTS_ON) {
+  const anchor = atLocalNoon(date);
+  const offset = (anchor.getDay() - weekStartsOn + 7) % 7;
+  return addDays(anchor, -offset);
+}
+
+export function getWeekDays(date: Date, weekStartsOn = WEEK_STARTS_ON) {
+  const start = startOfWeek(date, weekStartsOn);
+  return Array.from({ length: 7 }, (_, index) => addDays(start, index));
+}
+
+function visibleRange(startDate: Date, dayCount: number): VisibleRange {
+  const start = new Date(
+    startDate.getFullYear(),
+    startDate.getMonth(),
+    startDate.getDate(),
+  );
+  return {
+    start,
+    end: new Date(start.getFullYear(), start.getMonth(), start.getDate() + dayCount),
+  };
+}
+
+export function visibleRangeForDay(date: Date) {
+  return visibleRange(date, 1);
+}
+
+export function visibleRangeForWeek(date: Date, weekStartsOn = WEEK_STARTS_ON) {
+  return visibleRange(startOfWeek(date, weekStartsOn), 7);
 }
 
 export function getMonthDays(
@@ -108,20 +148,12 @@ export function getMonthDays(
   });
 }
 
-export function visibleRangeForMonth(anchorDate: Date): VisibleRange {
-  const firstDay = getMonthDays(anchorDate)[0].date;
-  const start = new Date(
-    firstDay.getFullYear(),
-    firstDay.getMonth(),
-    firstDay.getDate(),
-  );
-  const end = new Date(
-    start.getFullYear(),
-    start.getMonth(),
-    start.getDate() + DAYS_IN_MONTH_GRID,
-  );
-
-  return { start, end };
+export function visibleRangeForMonth(
+  anchorDate: Date,
+  weekStartsOn = WEEK_STARTS_ON,
+): VisibleRange {
+  const firstDay = getMonthDays(anchorDate, new Date(), weekStartsOn)[0].date;
+  return visibleRange(firstDay, DAYS_IN_MONTH_GRID);
 }
 
 export function eventOccursOnDate(event: EventOccurrence, date: Date) {
@@ -170,6 +202,21 @@ export function sortEvents(events: EventOccurrence[]) {
 
 export function eventsForDate(events: EventOccurrence[], date: Date) {
   return sortEvents(events.filter((event) => eventOccursOnDate(event, date)));
+}
+
+export function tasksForDate(tasks: ScheduleTask[], date: Date) {
+  const key = localDateKey(date);
+  return tasks
+    .filter(
+      (task) =>
+        task.status === "open" &&
+        task.dueAt !== null &&
+        localDateKey(task.dueAt) === key,
+    )
+    .sort((left, right) =>
+      (left.dueAt?.getTime() ?? 0) - (right.dueAt?.getTime() ?? 0) ||
+      left.title.localeCompare(right.title),
+    );
 }
 
 export function getMonthAgenda(

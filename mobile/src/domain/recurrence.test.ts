@@ -154,6 +154,51 @@ for (const [interval, days] of [
   });
 }
 
+test("expands multi-weekday rules at arbitrary week intervals", () => {
+  const event = repeating(
+    rule({
+      frequency: "weekly",
+      interval: 2,
+      daysOfWeek: [1, 5],
+    }),
+    { startsAt: new Date("2026-08-14T09:00:00.000Z") },
+  );
+
+  assert.deepEqual(
+    isoStarts(
+      event,
+      "2026-08-14T00:00:00.000Z",
+      "2026-09-01T00:00:00.000Z",
+    ),
+    [
+      "2026-08-14T09:00:00.000Z",
+      "2026-08-24T09:00:00.000Z",
+      "2026-08-28T09:00:00.000Z",
+    ],
+  );
+});
+
+test("expands ordinal weekdays at arbitrary month intervals", () => {
+  const event = repeating(
+    rule({
+      frequency: "monthly",
+      interval: 2,
+      daysOfWeek: [5],
+      weekOfMonth: 1,
+    }),
+    { startsAt: new Date("2026-09-04T09:00:00.000Z") },
+  );
+
+  assert.deepEqual(
+    isoStarts(
+      event,
+      "2026-09-01T00:00:00.000Z",
+      "2027-01-01T00:00:00.000Z",
+    ),
+    ["2026-09-04T09:00:00.000Z", "2026-11-06T09:00:00.000Z"],
+  );
+});
+
 test("expands every five hours as elapsed-hour intervals", () => {
   const event = repeating(rule({ frequency: "hourly", interval: 5 }), {
     startsAt: new Date("2026-08-11T00:00:00.000Z"),
