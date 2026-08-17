@@ -4,10 +4,10 @@ The web client is a Vite/React/TypeScript schedule in Simply Lift's restrained v
 
 - **Home** — a picker-free current-week agenda with every date shown, including empty days;
 - **Calendar** — uncluttered day, week, and month views with mixed task/event rows;
-- **Settings** — week start, default view, event timezone, and data status;
+- **Settings** — aligned week-start/default-view toggles and data status;
 - one persistent **+ SCHEDULE** action and a compact profile/data panel.
 
-The create sheet starts with title/date/time. Notes and timezone details are progressively disclosed. Recurrence supports arbitrary 1–99 intervals over hours, days, weeks, months, or years; weekday sets; numeric or last month dates; ordinal weekdays such as first Friday; yearly month selectors; independent start anchors; and never, inclusive through-date, or bounded occurrence-count termination.
+The unified create sheet switches cleanly between tasks and events, offers a shared Neovim-inspired color palette, and keeps notes behind a compact disclosure. Recurrence supports arbitrary 1–99 intervals over hours, days, weeks, months, or years; weekday sets; numeric or last month dates; ordinal weekdays such as first Friday; yearly month selectors; independent start anchors; and never, inclusive through-date, or bounded occurrence-count termination.
 
 The canonical web/iOS data model is [`../firebase/CALENDAR_EVENT_CONTRACT.md`](../firebase/CALENDAR_EVENT_CONTRACT.md).
 
@@ -19,7 +19,7 @@ npm ci
 npm run dev
 ```
 
-Open the URL printed by Vite (normally <http://localhost:5173>). Without a complete Firebase environment, the app clearly labels itself `LOCAL PREVIEW`. Sample tasks/events and newly created events remain in memory for that browser session and are never uploaded.
+Open the URL printed by Vite (normally <http://localhost:5173>). Without a complete Firebase environment, the app clearly labels itself `LOCAL PREVIEW`. Sample tasks/events and newly created schedule items remain in memory for that browser session and are never uploaded.
 
 ## Run against Firebase
 
@@ -31,7 +31,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Enable Firebase **Anonymous Auth**. The app signs in (or reuses the browser's anonymous session), reads open tasks and event candidates for the active Home/day/week/month range, and writes canonical event documents under:
+Enable Firebase **Anonymous Auth**. The app signs in (or reuses the browser's anonymous session), reads open tasks and event candidates for the active Home/day/week/month range, and writes compatible canonical task/event documents under:
 
 ```text
 users/{uid}/tasks/{taskId}
@@ -82,13 +82,13 @@ Set the `VITE_FIREBASE_*` values above and `FIREBASE_E2E=true` while running Pla
 
 ## Structure
 
-- `src/domain/events.ts` / `tasks.ts` — canonical schedule documents, occurrences, and visible-range types.
+- `src/domain/events.ts` / `tasks.ts` / `colors.ts` — canonical schedule documents, occurrences, visible ranges, and shared palette keys.
 - `src/domain/eventForm.ts` — expressive rule normalization, summaries, anchor semantics, and validation.
 - `src/domain/recurrence.ts` — timezone-aware, capped range expansion and stable occurrence keys.
 - `src/domain/calendar.ts` — date-grid navigation, sorting, day intersection, and agenda projection.
 - `src/lib/firebase.ts` — Vite environment validation, Firebase initialization, emulator connections, and anonymous auth.
-- `src/services/eventRepository.ts` / `taskRepository.ts` — strict Firestore conversion and visible-range listeners, plus canonical event writes and emulator seeding.
-- `src/context/` — canonical task/event state, visible-range subscription lifecycle, and event creation.
+- `src/services/eventRepository.ts` / `taskRepository.ts` — strict Firestore conversion and visible-range listeners, plus canonical task/event writes, completion, and emulator seeding.
+- `src/context/` — canonical task/event state, visible-range subscription lifecycle, and task/event creation and completion.
 - `src/components/` — weekly agenda, mixed task/event rows, day/week/month projections, Settings, profile panel, and progressive create sheet.
 - `e2e/calendar.spec.ts` — Chromium navigation plus create/expand/persist acceptance flows.
 

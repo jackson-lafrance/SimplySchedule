@@ -19,7 +19,7 @@ Both calendar clients use Firebase Anonymous Auth when their platform Firebase c
 
 ## Event document
 
-Every event has exactly these fields:
+Every event keeps the existing required fields below and may add the backward-compatible `color` field:
 
 | Field | Firestore type | Contract |
 | --- | --- | --- |
@@ -30,6 +30,7 @@ Every event has exactly these fields:
 | `endsAt` | timestamp or null | Exclusive end. Must be after `startsAt` when present. Required for all-day events; null means a timed point event. For a series, `endsAt - startsAt` is each occurrence's duration. |
 | `allDay` | boolean | Whether the item uses all-day date boundaries. |
 | `timeZone` | string | IANA zone used for all-day boundaries and recurrence, such as `America/Los_Angeles`. |
+| `color` | string (optional) | One shared palette key: `blue`, `teal`, `green`, `yellow`, `peach`, `red`, or `mauve`. Missing values use the client default. |
 | `recurrence` | map or null | Null for `single`; the versioned rule below for `repeating`. |
 | `createdAt` | timestamp | Lifecycle timestamp. Event-creation clients should set this with a server timestamp and preserve it on updates. |
 | `updatedAt` | timestamp | Lifecycle timestamp. Event-creation clients should refresh it with a server timestamp on mutation. |
@@ -133,4 +134,4 @@ The web domain expander clips all point/duration occurrences to the same half-op
 - Missing/incomplete platform Firebase configuration selects an explicit `LOCAL PREVIEW` with the same in-memory single-event fixtures. Web-created preview events last for the browser session and are never uploaded.
 - Web uses `VITE_FIREBASE_*`; iOS uses `EXPO_PUBLIC_FIREBASE_*`. Both target the Firebase project selected by `.firebaserc` and the emulator ports in `firebase.json`.
 - When each platform's `*_FIREBASE_USE_EMULATORS=true` and `*_FIREBASE_SEED_EMULATOR=true`, an empty anonymous user's event collection receives the same minimal preview events. This is development-only proof data.
-- The web client creates canonical single and repeating documents with generated document IDs and server values for both lifecycle timestamps. Its strict encoder writes exactly the documented fields. Edit/delete and occurrence exceptions remain outside this phase.
+- The web client creates canonical single and repeating documents with generated document IDs and server values for both lifecycle timestamps. It writes the optional shared palette key; existing and mobile documents without it remain valid and decode with a default. Edit/delete and occurrence exceptions remain outside this phase.

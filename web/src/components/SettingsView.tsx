@@ -22,8 +22,6 @@ export default function SettingsView({
   status: ScheduleStatus;
   weekStartsOn: WeekStart;
 }) {
-  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-
   return (
     <div className="screen settings-screen">
       <header className="screen-heading">
@@ -33,47 +31,48 @@ export default function SettingsView({
       </header>
 
       <div className="settings-list">
-        <label className="setting-card">
+        <div className="setting-card">
           <span>
             <strong>Week start</strong>
             <small>Used by Home, week, and month views.</small>
           </span>
-          <select
-            aria-label="Week starts on"
-            onChange={(event) =>
-              onWeekStartChange(event.target.value === "0" ? 0 : 1)
-            }
-            value={weekStartsOn}
-          >
-            <option value={1}>Monday</option>
-            <option value={0}>Sunday</option>
-          </select>
-        </label>
-
-        <label className="setting-card">
-          <span>
-            <strong>Default calendar view</strong>
-            <small>Saved in this browser for the next time you open Calendar.</small>
-          </span>
-          <select
-            aria-label="Default calendar view"
-            onChange={(event) =>
-              onCalendarViewChange(event.target.value as CalendarView)
-            }
-            value={calendarView}
-          >
-            <option value="day">Day</option>
-            <option value="week">Week</option>
-            <option value="month">Month</option>
-          </select>
-        </label>
+          <div aria-label="Week starts on" className="settings-toggle" role="group">
+            {([1, 0] as WeekStart[]).map((value) => (
+              <button
+                aria-pressed={weekStartsOn === value}
+                className={weekStartsOn === value ? "toggle-active" : ""}
+                key={value}
+                onClick={() => onWeekStartChange(value)}
+                type="button"
+              >
+                {value === 1 ? "Monday" : "Sunday"}
+              </button>
+            ))}
+          </div>
+        </div>
 
         <div className="setting-card">
           <span>
-            <strong>Calendar timezone</strong>
-            <small>Recurrence follows this local wall clock across DST.</small>
+            <strong>Default calendar view</strong>
+            <small>Saved in this browser.</small>
           </span>
-          <code>{timeZone}</code>
+          <div
+            aria-label="Default calendar view"
+            className="settings-toggle"
+            role="group"
+          >
+            {(["day", "week", "month"] as CalendarView[]).map((view) => (
+              <button
+                aria-pressed={calendarView === view}
+                className={calendarView === view ? "toggle-active" : ""}
+                key={view}
+                onClick={() => onCalendarViewChange(view)}
+                type="button"
+              >
+                {view}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="setting-card">

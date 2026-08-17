@@ -59,6 +59,7 @@ A task document has the following fields:
 | `dueAt` | timestamp \| null | Optional due date/time. |
 | `completedAt` | timestamp \| null | Completion timestamp, when applicable. |
 | `position` | number | Ordering value within a task list or sibling group. |
+| `color` | string (optional) | Shared palette key; missing values use the task default. |
 | `createdAt` / `updatedAt` | timestamp | Server-managed lifecycle timestamps. |
 
 Subtasks stay in the same collection so list and calendar queries share one repository. The initial rules verify ownership and shape but cannot prove that `parentId` exists or prevent cycles; mutations that alter a hierarchy should use a transaction in the client repository.
@@ -67,7 +68,7 @@ Subtasks stay in the same collection so list and calendar queries share one repo
 
 The canonical cross-platform event schema, timestamp/all-day semantics, versioned recurrence grammar, required pattern encodings, and current web query are defined in [`CALENDAR_EVENT_CONTRACT.md`](./CALENDAR_EVENT_CONTRACT.md). That contract is shared by the React web and React Native iOS clients.
 
-An event has `title`, `notes`, `kind`, `startsAt`, `endsAt`, `allDay`, `timeZone`, `recurrence`, `createdAt`, and `updatedAt`. `kind` is `single` or `repeating`; single events use `recurrence: null`. Version 1 recurrence supports hourly, daily, weekly, monthly, and yearly intervals plus numeric-day and ordinal-weekday selectors. It can represent first-of-month, third-Friday, every-other-day, every-three-days, and every-five-hours without materialized occurrence documents.
+An event has `title`, `notes`, `kind`, `startsAt`, `endsAt`, `allDay`, `timeZone`, `recurrence`, `createdAt`, and `updatedAt`, plus an optional backward-compatible `color` palette key. `kind` is `single` or `repeating`; single events use `recurrence: null`. Version 1 recurrence supports hourly, daily, weekly, monthly, and yearly intervals plus numeric-day and ordinal-weekday selectors. It can represent first-of-month, third-Friday, every-other-day, every-three-days, and every-five-hours without materialized occurrence documents.
 
 Calendar, list, and agenda views are projections over these documents and should not become separate sources of truth. The indexes cover sibling ordering, task status/due-date filtering, and event kind/start-date filtering; add an index only when a concrete query requires one.
 
@@ -85,4 +86,4 @@ Not included yet:
 - Occurrence exceptions, task hierarchy mutation logic, reminders, or Cloud Functions.
 - Mobile implementation changes in the web delivery.
 
-The React web client initializes Firebase when its Vite environment is complete, authenticates an anonymous user, subscribes to user-scoped visible-range event candidates, writes exact canonical event documents with server lifecycle timestamps, and expands recurrence locally. See [`../web/README.md`](../web/README.md) for live and emulator run instructions.
+The React web client initializes Firebase when its Vite environment is complete, authenticates an anonymous user, subscribes to user-scoped visible-range tasks and event candidates, writes compatible canonical task/event documents with server lifecycle timestamps, and expands recurrence locally. See [`../web/README.md`](../web/README.md) for live and emulator run instructions.

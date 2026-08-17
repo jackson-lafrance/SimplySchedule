@@ -1,17 +1,25 @@
 import {
   collection,
+  doc,
   onSnapshot,
   orderBy,
   query,
+  serverTimestamp,
+  setDoc,
   Timestamp,
+  updateDoc,
   where,
   type DocumentData,
   type Firestore,
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
 
+import {
+  DEFAULT_TASK_COLOR,
+  isScheduleColor,
+} from "@/domain/colors";
 import type { VisibleRange } from "@/domain/events";
-import type { ScheduleTask } from "@/domain/tasks";
+import type { CreateTaskInput, ScheduleTask } from "@/domain/tasks";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -63,6 +71,7 @@ export function decodeTaskDocument(id: string, value: unknown): ScheduleTask {
     dueAt: nullableDate(value.dueAt, "dueAt"),
     completedAt: nullableDate(value.completedAt, "completedAt"),
     position,
+    color: isScheduleColor(value.color) ? value.color : DEFAULT_TASK_COLOR,
     createdAt: dateValue(value.createdAt, "createdAt"),
     updatedAt: dateValue(value.updatedAt, "updatedAt"),
   };
@@ -106,4 +115,50 @@ export function subscribeToTasksInRange(
     },
     onError,
   );
+}
+
+export function encodeCreateTaskDocument(
+  input: CreateTaskInput,
+  lifecycleTimestamp: unknown,
+  position: number,
+) {
+  return {
+    title: input.title.trim(),
+    notes: input.notes,
+    status: "open" as const,
+    parentId: null,
+    dueAt: Timestamp.fromDate(input.dueAt),
+    completedAt: null,
+    position,
+    color: input.color,
+    createdAt: lifecycleTimestamp,
+    updatedAt: lifecycleTimestamp,
+  };
+}
+
+export async function createTask(
+  db: Firestore,
+  userId: string,
+  input: CreateTaskInput,
+) {
+  const reference = doc(collection(db, "users", userId, "tasks"));
+  const lifecycleTimestamp = serverTimestamp();
+  await setDoc(
+    reference,
+    encodeCreateTaskDocument(input, lifecycleTimestamp, Date.now()),
+  );
+  return reference.id;
+}
+
+export async function completeTask(
+  db: Firestore,
+  userId: string,
+  taskId: string,
+) {
+  const completedAt = serverTimestamp();
+  await updateDoc(doc(db, "users", userId, "tasks", taskId), {
+    status: "completed",
+    completedAt,
+    updatedAt: completedAt,
+  });
 }

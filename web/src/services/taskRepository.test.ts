@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { decodeTaskDocument } from "@/services/taskRepository";
+import {
+  decodeTaskDocument,
+  encodeCreateTaskDocument,
+} from "@/services/taskRepository";
 
 const dueAt = new Date("2026-08-11T16:30:00.000Z");
 
@@ -31,6 +34,25 @@ describe("Firestore task decoding", () => {
     expect(task.title).toBe("Send agenda");
     expect(task.status).toBe("open");
     expect(task.dueAt).toEqual(dueAt);
+    expect(task.color).toBe("green");
+  });
+
+  it("encodes task colors in the compatible canonical extension", () => {
+    const lifecycleTimestamp = { serverTimestamp: true };
+    const document = encodeCreateTaskDocument(
+      {
+        title: "  Send agenda  ",
+        notes: "",
+        dueAt,
+        color: "teal",
+      },
+      lifecycleTimestamp,
+      12,
+    );
+
+    expect(document.title).toBe("Send agenda");
+    expect(document.color).toBe("teal");
+    expect(document.dueAt.toDate()).toEqual(dueAt);
   });
 
   it("rejects malformed task data", () => {

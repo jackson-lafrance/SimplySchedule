@@ -14,6 +14,10 @@ import {
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
 
+import {
+  DEFAULT_EVENT_COLOR,
+  isScheduleColor,
+} from "@/domain/colors";
 import type {
   CalendarEvent,
   CreateEventInput,
@@ -273,6 +277,7 @@ export function decodeEventDocument(
     endsAt: nullableDateValue(value.endsAt, "endsAt"),
     allDay,
     timeZone: timeZoneString(value),
+    color: isScheduleColor(value.color) ? value.color : DEFAULT_EVENT_COLOR,
     createdAt: dateValue(value.createdAt, "createdAt"),
     updatedAt: dateValue(value.updatedAt, "updatedAt"),
   };
@@ -410,6 +415,7 @@ export function encodeCreateEventDocument(
     endsAt: input.endsAt ? Timestamp.fromDate(input.endsAt) : null,
     allDay: input.allDay,
     timeZone: input.timeZone,
+    color: input.color ?? DEFAULT_EVENT_COLOR,
     recurrence: encodeRecurrence(input.recurrence),
     createdAt: lifecycleTimestamp,
     updatedAt: lifecycleTimestamp,

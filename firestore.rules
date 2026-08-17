@@ -30,6 +30,7 @@ service cloud.firestore {
           'dueAt',
           'completedAt',
           'position',
+          'color',
           'createdAt',
           'updatedAt'
         ])
@@ -43,6 +44,7 @@ service cloud.firestore {
         && (data.dueAt == null || data.dueAt is timestamp)
         && (data.completedAt == null || data.completedAt is timestamp)
         && data.position is number
+        && (!data.keys().hasAny(['color']) || data.color in ['blue', 'teal', 'green', 'yellow', 'peach', 'red', 'mauve'])
         && data.createdAt is timestamp
         && data.updatedAt is timestamp;
     }
@@ -190,6 +192,7 @@ service cloud.firestore {
           'endsAt',
           'allDay',
           'timeZone',
+          'color',
           'recurrence',
           'createdAt',
           'updatedAt'
@@ -209,6 +212,7 @@ service cloud.firestore {
         && data.timeZone is string
         && data.timeZone.size() > 0
         && data.timeZone.size() <= 100
+        && (!data.keys().hasAny(['color']) || data.color in ['blue', 'teal', 'green', 'yellow', 'peach', 'red', 'mauve'])
         && (
           (data.kind == 'single' && data.recurrence == null)
           || (data.kind == 'repeating' && data.recurrence is map && validRecurrence(data.recurrence))

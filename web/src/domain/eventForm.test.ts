@@ -16,6 +16,7 @@ function draft(overrides: Partial<EventDraft> = {}): EventDraft {
     startTime: "09:00",
     endTime: "10:00",
     allDay: false,
+    color: "mauve",
     repeatFrequency: "none",
     interval: "1",
     daysOfWeek: [2],
@@ -90,6 +91,7 @@ describe("event creation normalization", () => {
     );
 
     expect(input.title).toBe("Release check");
+    expect(input.color).toBe("mauve");
     expect(input.kind).toBe("repeating");
     expect(input.recurrence).toMatchObject({
       version: 1,
