@@ -1160,7 +1160,8 @@ const styles = StyleSheet.create({
   },
   weekdays: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    flexWrap: "wrap",
+    justifyContent: "flex-start",
     gap: 3,
   },
   wrapChips: {
@@ -1171,8 +1172,9 @@ const styles = StyleSheet.create({
   colorPicker: {
     minHeight: 48,
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "flex-start",
     gap: spacing.xxs,
   },
   colorOption: {

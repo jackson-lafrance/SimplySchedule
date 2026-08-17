@@ -211,10 +211,20 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
 
   const completeTask = useCallback(async (taskId: string) => {
     if (!configuredClient) {
+      const now = new Date();
       setState((current) => ({
         ...current,
-        tasks: current.tasks.filter((task) => task.id !== taskId),
-        lastUpdatedAt: new Date(),
+        tasks: current.tasks.map((task) =>
+          task.id === taskId
+            ? {
+                ...task,
+                status: "completed",
+                completedAt: now,
+                updatedAt: now,
+              }
+            : task,
+        ),
+        lastUpdatedAt: now,
       }));
       return;
     }

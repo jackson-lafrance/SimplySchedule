@@ -341,6 +341,21 @@ test("keeps leap-day yearly rules on valid years only", () => {
   );
 });
 
+test("quickly returns no occurrences for an impossible yearly date", () => {
+  const event = repeating(
+    rule({
+      frequency: "yearly",
+      monthOfYear: 2,
+      dayOfMonth: 31,
+    }),
+  );
+
+  assert.deepEqual(
+    isoStarts(event, "2026-01-01T00:00:00.000Z", "2027-01-01T00:00:00.000Z"),
+    [],
+  );
+});
+
 test("expands last-weekday monthly selectors", () => {
   const event = repeating(
     rule({
