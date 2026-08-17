@@ -5,7 +5,7 @@
 **Clients:** React web and React Native iOS
 **Canonical store:** Cloud Firestore in the Firebase project selected by `.firebaserc`
 
-This document is the cross-platform contract for calendar viewing and event creation/recurrence. Firestore stores canonical event documents; month, agenda, day, and week displays are client projections and are never written as separate documents. The web client implements this full contract; platform delivery status does not change the shared schema.
+This document is the cross-platform contract for calendar viewing and event creation/recurrence. Firestore stores canonical event documents; month, agenda, day, and week displays are client projections and are never written as separate documents. The React web and React Native iOS clients implement this contract against the same backend.
 
 ## Ownership and path
 
@@ -30,10 +30,26 @@ Every event keeps the existing required fields below and may add the backward-co
 | `endsAt` | timestamp or null | Exclusive end. Must be after `startsAt` when present. Required for all-day events; null means a timed point event. For a series, `endsAt - startsAt` is each occurrence's duration. |
 | `allDay` | boolean | Whether the item uses all-day date boundaries. |
 | `timeZone` | string | IANA zone used for all-day boundaries and recurrence, such as `America/Los_Angeles`. |
-| `color` | string (optional) | One shared palette key: `blue`, `teal`, `green`, `yellow`, `peach`, `red`, or `mauve`. Missing values use the client default. |
+| `color` | string (optional) | One shared palette key: `blue`, `teal`, `green`, `yellow`, `peach`, `red`, or `mauve`. Missing values use the mauve event default. |
 | `recurrence` | map or null | Null for `single`; the versioned rule below for `repeating`. |
 | `createdAt` | timestamp | Lifecycle timestamp. Event-creation clients should set this with a server timestamp and preserve it on updates. |
 | `updatedAt` | timestamp | Lifecycle timestamp. Event-creation clients should refresh it with a server timestamp on mutation. |
+
+### Schedule color palette
+
+Color IDs are stable Firebase values shared by tasks and events. Clients render them with this Neovim-inspired palette:
+
+| ID | Hex |
+| --- | --- |
+| `blue` | `#89B4FA` |
+| `teal` | `#94E2D5` |
+| `green` | `#A6E3A1` |
+| `yellow` | `#F9E2AF` |
+| `peach` | `#FAB387` |
+| `red` | `#F38BA8` |
+| `mauve` | `#CBA6F7` |
+
+Firestore stores the ID rather than the display hex so both clients can render the same semantic selection. Legacy task/event documents without `color` remain valid and use green/mauve defaults respectively.
 
 ### Date semantics
 
@@ -83,8 +99,8 @@ Termination semantics:
 - `afterOccurrences`: positive integer `count`, including the first occurrence that matches the rule on or after the anchor; `until` is null.
 - Missing monthly days (for example day 31 in April) are skipped, not clamped.
 - Calendar arithmetic happens in `timeZone`; elapsed UTC hours must not replace local calendar arithmetic for daily/weekly/monthly/yearly rules. Hourly recurrence uses elapsed-hour intervals.
-- The web through-date control stores the end of the chosen local day, so every occurrence start on that date remains included.
-- The web editor exposes the anchor independently from selectors. It defaults selectors from the anchor date, but an explicitly different weekday/date/ordinal begins at the first matching occurrence after the anchor. This is compatible with the existing iOS expander.
+- Each through-date control stores the end of the chosen local day, so every occurrence start on that date remains included.
+- Editors may expose the anchor independently from selectors. Web persists the selected anchor; iOS advances its selected anchor to the first matching occurrence before persistence. Both representations expand from the first selector match on or after `startsAt`.
 
 ### Required pattern encodings
 
@@ -108,9 +124,11 @@ Termination semantics:
 
 Each example also includes `version: 1` and a complete `termination` map in Firestore.
 
+The iOS recurrence builder exposes the full version 1 grammar rather than limiting creation to these examples: arbitrary intervals, multi-weekday weekly rules, numeric or ordinal monthly/yearly selectors, yearly month selection, and every bounded termination type. Its selected date/time is a start anchor; canonical `startsAt` advances to the first selector match so it remains the actual first occurrence.
+
 ## Query and projection contract
 
-The web repository uses the displayed six-week range `[rangeStart, rangeEnd)` and combines three user-scoped listeners:
+Each platform repository uses its active visible range `[rangeStart, rangeEnd)` and combines three user-scoped listeners:
 
 ```text
 point single events:
@@ -127,11 +145,11 @@ repeating series candidates:
 
 The committed indexes support these concrete query shapes. The repository converts Firestore timestamps at its boundary, strictly validates kind/recurrence invariants, merges snapshots by canonical ID, and keeps Firestore details out of components.
 
-The web domain expander clips all point/duration occurrences to the same half-open range and emits at most 2,000 occurrences per projection, with a defensive 100,000-iteration ceiling. A repeating occurrence key is `<eventId>@<start-instant-ISO>` so hourly occurrences remain unique through repeated daylight-saving wall times. The occurrence retains its canonical `eventId`; it is not an independently persisted event.
+Each platform domain expander clips all point/duration occurrences to the same half-open range and emits at most 2,000 occurrences per projection, with a defensive 100,000-iteration ceiling. A repeating occurrence key is `<eventId>@<start-instant-ISO>` so hourly occurrences remain unique through repeated daylight-saving wall times. The occurrence retains its canonical `eventId`; it is not an independently persisted event.
 
 ## Runtime and preview behavior
 
-- Missing/incomplete platform Firebase configuration selects an explicit `LOCAL PREVIEW` with the same in-memory single-event fixtures. Web-created preview events last for the browser session and are never uploaded.
+- Missing/incomplete platform Firebase configuration selects an explicit `LOCAL PREVIEW` with the same in-memory single-event fixtures. Created preview events last for the current browser/app session and are never uploaded.
 - Web uses `VITE_FIREBASE_*`; iOS uses `EXPO_PUBLIC_FIREBASE_*`. Both target the Firebase project selected by `.firebaserc` and the emulator ports in `firebase.json`.
 - When each platform's `*_FIREBASE_USE_EMULATORS=true` and `*_FIREBASE_SEED_EMULATOR=true`, an empty anonymous user's event collection receives the same minimal preview events. This is development-only proof data.
-- The web client creates canonical single and repeating documents with generated document IDs and server values for both lifecycle timestamps. It writes the optional shared palette key; existing and mobile documents without it remain valid and decode with a default. Edit/delete and occurrence exceptions remain outside this phase.
+- Both clients create canonical single and repeating documents with generated document IDs and server values for both lifecycle timestamps. They write the optional shared palette key and decode existing documents without it using semantic defaults. Edit/delete and occurrence exceptions remain outside this phase.

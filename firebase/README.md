@@ -34,7 +34,7 @@ No service-account credentials or production secrets belong in this repository. 
 - [`../mobile/.env.example`](../mobile/.env.example) for Expo (`EXPO_PUBLIC_FIREBASE_*`).
 - [`../web/.env.example`](../web/.env.example) for Vite (`VITE_FIREBASE_*`).
 
-The React web client is wired to this boundary for visible-range calendar reads and canonical event creation. Mobile delivery remains separate.
+The React web and React Native iOS clients use this boundary for visible-range calendar reads, canonical event creation, and bounded local recurrence expansion. iOS also creates, lists, and completes canonical due tasks.
 
 ## Initial Firestore shape
 
@@ -59,16 +59,16 @@ A task document has the following fields:
 | `dueAt` | timestamp \| null | Optional due date/time. |
 | `completedAt` | timestamp \| null | Completion timestamp, when applicable. |
 | `position` | number | Ordering value within a task list or sibling group. |
-| `color` | string (optional) | Shared palette key; missing values use the task default. |
+| `color` | string (optional) | Shared Neovim-inspired palette key; missing values use the green task default. |
 | `createdAt` / `updatedAt` | timestamp | Server-managed lifecycle timestamps. |
 
-Subtasks stay in the same collection so list and calendar queries share one repository. The initial rules verify ownership and shape but cannot prove that `parentId` exists or prevent cycles; mutations that alter a hierarchy should use a transaction in the client repository.
+Subtasks stay in the same collection so list and calendar queries share one repository. The iOS agenda queries open tasks by the visible `dueAt` range, creates top-level tasks with `parentId: null`, and uses server timestamps when completing them. The rules verify ownership and shape but cannot prove that `parentId` exists or prevent cycles; mutations that alter a hierarchy should use a transaction in the client repository.
 
 ### Single and repeating events
 
-The canonical cross-platform event schema, timestamp/all-day semantics, versioned recurrence grammar, required pattern encodings, and current web query are defined in [`CALENDAR_EVENT_CONTRACT.md`](./CALENDAR_EVENT_CONTRACT.md). That contract is shared by the React web and React Native iOS clients.
+The canonical cross-platform event schema, timestamp/all-day semantics, versioned recurrence grammar, required pattern encodings, and platform query shapes are defined in [`CALENDAR_EVENT_CONTRACT.md`](./CALENDAR_EVENT_CONTRACT.md). That contract is shared by the React web and React Native iOS clients.
 
-An event has `title`, `notes`, `kind`, `startsAt`, `endsAt`, `allDay`, `timeZone`, `recurrence`, `createdAt`, and `updatedAt`, plus an optional backward-compatible `color` palette key. `kind` is `single` or `repeating`; single events use `recurrence: null`. Version 1 recurrence supports hourly, daily, weekly, monthly, and yearly intervals plus numeric-day and ordinal-weekday selectors. It can represent first-of-month, third-Friday, every-other-day, every-three-days, and every-five-hours without materialized occurrence documents.
+An event has `title`, `notes`, `kind`, `startsAt`, `endsAt`, `allDay`, `timeZone`, `recurrence`, `createdAt`, and `updatedAt`, plus an optional backward-compatible `color` palette key. Missing color uses the mauve event default. `kind` is `single` or `repeating`; single events use `recurrence: null`. Version 1 recurrence supports hourly, daily, weekly, monthly, and yearly intervals plus numeric-day and ordinal-weekday selectors. It can represent first-of-month, third-Friday, every-other-day, every-three-days, and every-five-hours without materialized occurrence documents.
 
 Calendar, list, and agenda views are projections over these documents and should not become separate sources of truth. The indexes cover sibling ordering, task status/due-date filtering, and event kind/start-date filtering; add an index only when a concrete query requires one.
 
@@ -82,8 +82,7 @@ Included:
 
 Not included yet:
 
-- Web event editing/deletion, account screens, or an offline outbox.
+- Event editing/deletion, account screens, or an offline outbox.
 - Occurrence exceptions, task hierarchy mutation logic, reminders, or Cloud Functions.
-- Mobile implementation changes in the web delivery.
 
-The React web client initializes Firebase when its Vite environment is complete, authenticates an anonymous user, subscribes to user-scoped visible-range tasks and event candidates, writes compatible canonical task/event documents with server lifecycle timestamps, and expands recurrence locally. See [`../web/README.md`](../web/README.md) for live and emulator run instructions.
+Both clients initialize Firebase when their platform environment is complete, authenticate an anonymous user, subscribe to user-scoped visible-range tasks and event candidates, write compatible canonical task/event documents with server lifecycle timestamps and shared color keys, and expand recurrence locally. Both support task creation/completion. See [`../web/README.md`](../web/README.md) and [`../mobile/README.md`](../mobile/README.md) for run instructions.
