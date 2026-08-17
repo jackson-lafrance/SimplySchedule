@@ -1,6 +1,13 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import type { CalendarDay } from "@/domain/calendar";
+import {
+  eventsForDate,
+  tasksForDate,
+  type CalendarDay,
+} from "@/domain/calendar";
+import type { EventOccurrence } from "@/domain/events";
+import type { ScheduleTask } from "@/domain/tasks";
+import { scheduleColorValue } from "@/domain/scheduleColors";
 import type { WeekStart } from "@/domain/preferences";
 import { colors, radii, spacing, typography } from "@/theme";
 
@@ -14,11 +21,15 @@ const accessibilityDateFormatter = new Intl.DateTimeFormat("en-US", {
 
 export default function MonthGrid({
   days,
+  events,
+  tasks,
   selectedKey,
   weekStartsOn,
   onSelectDay,
 }: {
   days: CalendarDay[];
+  events: EventOccurrence[];
+  tasks: ScheduleTask[];
   selectedKey: string;
   weekStartsOn: WeekStart;
   onSelectDay: (day: CalendarDay) => void;
@@ -42,9 +53,18 @@ export default function MonthGrid({
       <View style={styles.grid}>
         {days.map((day) => {
           const selected = day.key === selectedKey;
+          const dayEvents = eventsForDate(events, day.date);
+          const dayTasks = tasksForDate(tasks, day.date);
+          const itemColors = [
+            ...dayTasks.map((task) => scheduleColorValue(task.color)),
+            ...dayEvents.map((event) => scheduleColorValue(event.color)),
+          ];
+          const itemCount = itemColors.length;
           return (
             <Pressable
-              accessibilityLabel={accessibilityDateFormatter.format(day.date)}
+              accessibilityLabel={`${accessibilityDateFormatter.format(day.date)}, ${itemCount} ${
+                itemCount === 1 ? "item" : "items"
+              }`}
               accessibilityRole="button"
               accessibilityState={{ selected }}
               key={day.key}
@@ -65,6 +85,18 @@ export default function MonthGrid({
               >
                 {day.dayNumber}
               </Text>
+              <View
+                accessibilityElementsHidden
+                style={styles.markers}
+              >
+                {itemColors.slice(0, 3).map((color, index) => (
+                  <View
+                    key={`${day.key}-marker-${index}`}
+                    style={[styles.marker, { backgroundColor: color }]}
+                  />
+                ))}
+                {itemCount > 3 ? <Text style={styles.moreMarker}>+</Text> : null}
+              </View>
               {day.isToday ? <View style={styles.todayDot} /> : null}
             </Pressable>
           );
@@ -96,7 +128,7 @@ const styles = StyleSheet.create({
   },
   day: {
     flexBasis: "14.285714%",
-    height: 44,
+    height: 50,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 6,
@@ -118,11 +150,30 @@ const styles = StyleSheet.create({
   selectedText: {
     color: colors.inverse,
   },
+  markers: {
+    minHeight: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 2,
+    marginTop: 2,
+  },
+  marker: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  moreMarker: {
+    color: colors.muted,
+    fontSize: 9,
+    fontWeight: "900",
+    lineHeight: 9,
+  },
   todayDot: {
     width: 5,
     height: 5,
     borderRadius: 3,
     marginTop: 2,
-    backgroundColor: "#A7E8B8",
+    backgroundColor: colors.accent,
   },
 });

@@ -1,5 +1,5 @@
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -29,6 +29,7 @@ export default function AppShell() {
     tasks,
   } = useSchedule();
   const [activeTab, setActiveTab] = useState<PrimaryTab>("home");
+  const addOrigin = useRef<PrimaryTab>("home");
   const [adding, setAdding] = useState(false);
   const [calendarDate, setCalendarDate] = useState(() =>
     atLocalNoon(new Date()),
@@ -95,6 +96,7 @@ export default function AppShell() {
       <BottomShelf
         activeTab={activeTab}
         onAdd={() => {
+          addOrigin.current = activeTab;
           const selectedDate = activeTab === "calendar"
             ? calendarDate
             : new Date();
@@ -106,9 +108,12 @@ export default function AppShell() {
       <CreateItemSheet
         initialDate={addDate}
         onClose={() => setAdding(false)}
-        onSaved={() => {
+        onSaved={(date, type) => {
           setAdding(false);
-          setActiveTab("home");
+          setCalendarDate(atLocalNoon(date));
+          setActiveTab(
+            type === "task" ? "home" : addOrigin.current,
+          );
         }}
         visible={adding}
       />

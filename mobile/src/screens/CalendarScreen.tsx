@@ -11,6 +11,7 @@ import { useSchedule } from "@/context/useSchedule";
 import {
   addDays,
   addMonths,
+  atLocalNoon,
   getMonthDays,
   getWeekDays,
   localDateKey,
@@ -21,7 +22,7 @@ import {
 } from "@/domain/calendar";
 import type { CalendarMode } from "@/domain/preferences";
 import { expandEventsInRange } from "@/domain/recurrence";
-import { colors, spacing } from "@/theme";
+import { colors, radii, spacing } from "@/theme";
 
 const dayTitle = new Intl.DateTimeFormat("en-US", {
   weekday: "long",
@@ -46,10 +47,12 @@ function weekTitle(days: Date[]) {
 function PeriodNavigation({
   onPrevious,
   onNext,
+  onToday,
   period,
 }: {
   onPrevious: () => void;
   onNext: () => void;
+  onToday: () => void;
   period: "day" | "week" | "month";
 }) {
   return (
@@ -68,6 +71,17 @@ function PeriodNavigation({
           size={24}
           color={colors.ink}
         />
+      </Pressable>
+      <Pressable
+        accessibilityLabel="Go to today"
+        accessibilityRole="button"
+        onPress={onToday}
+        style={({ pressed }) => [
+          styles.todayButton,
+          pressed && styles.pressed,
+        ]}
+      >
+        <Text style={styles.todayText}>TODAY</Text>
       </Pressable>
       <Pressable
         accessibilityLabel={`Next ${period}`}
@@ -168,6 +182,7 @@ export default function CalendarScreen({
           <PeriodNavigation
             onNext={() => onSelectDate(addDays(selectedDate, 1))}
             onPrevious={() => onSelectDate(addDays(selectedDate, -1))}
+            onToday={() => onSelectDate(atLocalNoon(new Date()))}
             period="day"
           />
         ) : null}
@@ -177,6 +192,7 @@ export default function CalendarScreen({
             <PeriodNavigation
               onNext={() => onSelectDate(addDays(selectedDate, 7))}
               onPrevious={() => onSelectDate(addDays(selectedDate, -7))}
+              onToday={() => onSelectDate(atLocalNoon(new Date()))}
               period="week"
             />
             <WeekdayStrip
@@ -197,13 +213,16 @@ export default function CalendarScreen({
               onPrevious={() =>
                 onSelectDate(addMonths(startOfMonth(selectedDate), -1))
               }
+              onToday={() => onSelectDate(atLocalNoon(new Date()))}
               period="month"
             />
             <View style={styles.monthContent}>
               <MonthGrid
                 days={monthDays}
+                events={events}
                 onSelectDay={(day) => onSelectDate(day.date)}
                 selectedKey={localDateKey(selectedDate)}
+                tasks={tasks}
                 weekStartsOn={preferences.weekStartsOn}
               />
             </View>
@@ -252,6 +271,21 @@ const styles = StyleSheet.create({
     minHeight: 44,
     alignItems: "center",
     justifyContent: "center",
+  },
+  todayButton: {
+    minWidth: 76,
+    minHeight: 36,
+    paddingHorizontal: spacing.sm,
+    borderWidth: 2,
+    borderColor: colors.ink,
+    borderRadius: radii.control,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  todayText: {
+    color: colors.ink,
+    fontSize: 10,
+    fontWeight: "900",
   },
   pressed: {
     opacity: 0.5,

@@ -224,7 +224,7 @@ export default function CreateItemSheet({
   visible: boolean;
   initialDate: string;
   onClose: () => void;
-  onSaved: (date: Date) => void;
+  onSaved: (date: Date, type: ItemType) => void;
 }) {
   const { createEvent, createTask } = useSchedule();
   const [itemType, setItemType] = useState<ItemType>("task");
@@ -324,11 +324,11 @@ export default function CreateItemSheet({
       if (itemType === "task") {
         const input = createTaskInputFromDraft(taskDraft, timeZone);
         await createTask(input);
-        onSaved(input.dueAt);
+        onSaved(input.dueAt, "task");
       } else {
         const input = createEventInputFromDraft(eventDraft, timeZone);
         await createEvent(input);
-        onSaved(input.startsAt);
+        onSaved(input.startsAt, "event");
       }
       onClose();
     } catch (error) {
@@ -531,6 +531,39 @@ export default function CreateItemSheet({
                   value={eventDraft.color}
                 />
 
+                <Pressable
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: eventDraft.recurrenceEnabled }}
+                  onPress={() => {
+                    const enabled = !eventDraft.recurrenceEnabled;
+                    updateEvent("recurrenceEnabled", enabled);
+                    if (enabled) setAdvanced(true);
+                  }}
+                  style={styles.optionRow}
+                >
+                  <View
+                    style={[
+                      styles.checkbox,
+                      eventDraft.recurrenceEnabled && styles.checked,
+                    ]}
+                  >
+                    {eventDraft.recurrenceEnabled ? (
+                      <MaterialIcons name="check" size={16} color="white" />
+                    ) : null}
+                  </View>
+                  <View style={styles.optionCopy}>
+                    <Text style={styles.optionTitle}>REPEAT</Text>
+                    <Text style={styles.optionMeta}>
+                      {recurrenceDraftSummary(eventDraft)}
+                    </Text>
+                  </View>
+                  <MaterialIcons
+                    name={eventDraft.recurrenceEnabled ? "expand-less" : "expand-more"}
+                    size={22}
+                    color={colors.ink}
+                  />
+                </Pressable>
+
                 {advanced ? (
                   <>
                     <Pressable
@@ -564,37 +597,6 @@ export default function CreateItemSheet({
                         value={eventDraft.notes}
                       />
                     </View>
-                    <Pressable
-                      accessibilityRole="checkbox"
-                      accessibilityState={{
-                        checked: eventDraft.recurrenceEnabled,
-                      }}
-                      onPress={() =>
-                        updateEvent(
-                          "recurrenceEnabled",
-                          !eventDraft.recurrenceEnabled,
-                        )
-                      }
-                      style={styles.optionRow}
-                    >
-                      <View
-                        style={[
-                          styles.checkbox,
-                          eventDraft.recurrenceEnabled && styles.checked,
-                        ]}
-                      >
-                        {eventDraft.recurrenceEnabled ? (
-                          <MaterialIcons name="check" size={16} color="white" />
-                        ) : null}
-                      </View>
-                      <View style={styles.optionCopy}>
-                        <Text style={styles.optionTitle}>REPEAT</Text>
-                        <Text style={styles.optionMeta}>
-                          {recurrenceDraftSummary(eventDraft)}
-                        </Text>
-                      </View>
-                    </Pressable>
-
                     {eventDraft.recurrenceEnabled ? (
                       <View style={styles.recurrenceCard}>
                         <Text style={styles.sectionTitle}>REPEAT RULE</Text>

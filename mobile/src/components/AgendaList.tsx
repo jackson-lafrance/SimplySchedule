@@ -1,4 +1,3 @@
-import { MaterialIcons } from "@expo/vector-icons";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -154,9 +153,7 @@ export default function AgendaList({
             <View style={[styles.checkGlyph, { borderColor: textColor }]}>
               {completing ? (
                 <ActivityIndicator color={textColor} size="small" />
-              ) : (
-                <MaterialIcons name="check" size={20} color={textColor} />
-              )}
+              ) : null}
             </View>
           </Pressable>
         ) : null}
