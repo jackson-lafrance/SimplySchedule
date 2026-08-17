@@ -227,10 +227,7 @@ export function tasksForDate(tasks: ScheduleTask[], date: Date) {
   const key = localDateKey(date);
   return tasks
     .filter(
-      (task) =>
-        task.status === "open" &&
-        task.dueAt !== null &&
-        localDateKey(task.dueAt) === key,
+      (task) => task.dueAt !== null && localDateKey(task.dueAt) === key,
     )
     .sort(
       (left, right) =>

@@ -95,7 +95,7 @@ function decodeSnapshot(document: QueryDocumentSnapshot<DocumentData>) {
   );
 }
 
-/** Reads only open tasks due inside the same active range as calendar events. */
+/** Reads tasks in the active range so completed items remain in every projection. */
 export function subscribeToTasksInRange(
   db: Firestore,
   userId: string,
@@ -105,7 +105,6 @@ export function subscribeToTasksInRange(
 ) {
   const tasksQuery = query(
     collection(db, "users", userId, "tasks"),
-    where("status", "==", "open"),
     where("dueAt", ">=", Timestamp.fromDate(range.start)),
     where("dueAt", "<", Timestamp.fromDate(range.end)),
     orderBy("dueAt", "asc"),

@@ -143,7 +143,11 @@ test("creates and completes colored tasks from the weekly agenda", async ({
   const row = await createTask(page, "Colored task proof");
   await expect(row).toHaveCSS("border-left-color", "rgb(137, 180, 250)");
   await row.getByRole("button", { name: "Mark Colored task proof complete" }).click();
-  await expect(row).toHaveCount(0);
+  await expect(row).toHaveClass(/agenda-row-completed/);
+  await expect(row).toContainText("COMPLETED");
+  await expect(
+    row.getByRole("button", { name: "Completed Colored task proof" }),
+  ).toBeDisabled();
 });
 
 test("keeps completion controls in day and month agenda projections", async ({
@@ -161,7 +165,8 @@ test("keeps completion controls in day and month agenda projections", async ({
   await dayRow
     .getByRole("button", { name: "Mark Cross-view task complete" })
     .click();
-  await expect(dayRow).toHaveCount(0);
+  await expect(dayRow).toHaveClass(/agenda-row-completed/);
+  await expect(dayRow).toContainText("COMPLETED");
 
   await page.getByRole("button", { name: "+ SCHEDULE" }).click();
   await page
@@ -186,7 +191,8 @@ test("keeps completion controls in day and month agenda projections", async ({
   await monthRow
     .getByRole("button", { name: "Mark Month task complete" })
     .click();
-  await expect(monthRow).toHaveCount(0);
+  await expect(monthRow).toHaveClass(/agenda-row-completed/);
+  await expect(monthRow).toContainText("COMPLETED");
 });
 
 test("creates an event quickly and discloses expressive recurrence", async ({ page }) => {
@@ -376,9 +382,12 @@ test("persists a created recurrence through Firebase rules", async ({ page }) =>
   await task
     .getByRole("button", { name: "Mark Firebase task proof complete" })
     .click();
-  await expect(task).toHaveCount(0);
+  await expect(task).toHaveClass(/agenda-row-completed/);
+  await expect(task).toContainText("COMPLETED");
   await page.reload();
-  await expect(
-    page.getByText("Firebase task proof", { exact: true }),
-  ).toHaveCount(0);
+  const completedTask = page.locator(".agenda-row-task").filter({
+    hasText: "Firebase task proof",
+  });
+  await expect(completedTask).toHaveClass(/agenda-row-completed/);
+  await expect(completedTask).toContainText("COMPLETED");
 });

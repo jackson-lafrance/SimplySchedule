@@ -78,11 +78,13 @@ export default function AgendaRows({
       <ol className="agenda-rows">
         {rows.map((row) => {
           const isTask = row.type === "task";
+          const completed = isTask && row.item.status === "completed";
           const timing = isTask
             ? row.item.dueAt
               ? `DUE ${timeFormatter.format(row.item.dueAt)}`
               : "NO DUE TIME"
             : eventTime(row.item);
+          const displayTiming = completed ? `COMPLETED · ${timing}` : timing;
           const palette = scheduleColorValue(
             row.item.color,
             isTask ? DEFAULT_TASK_COLOR : DEFAULT_EVENT_COLOR,
@@ -94,16 +96,21 @@ export default function AgendaRows({
 
           return (
             <li
-              aria-label={`${isTask ? "Task" : "Event"}, ${row.item.title}, ${timing}`}
-              className={`agenda-row agenda-row-${row.type}`}
+              aria-label={`${completed ? "Completed task" : isTask ? "Task" : "Event"}, ${row.item.title}, ${displayTiming}`}
+              className={`agenda-row agenda-row-${row.type}${completed ? " agenda-row-completed" : ""}`}
               key={`${row.type}-${row.item.id}`}
               style={style}
             >
               {isTask && onCompleteTask ? (
                 <button
-                  aria-label={`Mark ${row.item.title} complete`}
-                  className="task-check"
-                  disabled={completingId !== null}
+                  aria-label={
+                    completed
+                      ? `Completed ${row.item.title}`
+                      : `Mark ${row.item.title} complete`
+                  }
+                  aria-pressed={completed}
+                  className={`task-check${completed ? " task-check-completed" : ""}`}
+                  disabled={completed || completingId !== null}
                   onClick={() => void complete(row.item)}
                   type="button"
                 >
@@ -111,7 +118,7 @@ export default function AgendaRows({
                 </button>
               ) : null}
               <span className="agenda-row-copy">
-                <span className="agenda-row-meta">{timing}</span>
+                <span className="agenda-row-meta">{displayTiming}</span>
                 <strong>{row.item.title}</strong>
               </span>
             </li>

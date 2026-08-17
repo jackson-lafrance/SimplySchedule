@@ -85,7 +85,7 @@ describe("calendar month navigation", () => {
 });
 
 describe("event calendar projection", () => {
-  it("sorts only open tasks due on the selected local date", () => {
+  it("keeps completed tasks in their due-date position", () => {
     const dueAt = new Date(2026, 7, 11, 11);
     const task = (overrides: Partial<ScheduleTask>): ScheduleTask => ({
       id: "task-1",
@@ -111,7 +111,7 @@ describe("event calendar projection", () => {
         ],
         new Date(2026, 7, 11, 12),
       ).map(({ id }) => id),
-    ).toEqual(["earlier", "later"]);
+    ).toEqual(["earlier", "completed", "later"]);
   });
 
   it("shows a timed event on each local day it overlaps", () => {

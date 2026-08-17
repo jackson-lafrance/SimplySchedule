@@ -378,6 +378,19 @@ h3 {
   white-space: nowrap;
 }
 
+.agenda-row-completed {
+  background: var(--surface-muted);
+}
+
+.agenda-row-completed .agenda-row-meta {
+  color: var(--success-text);
+}
+
+.agenda-row-completed strong {
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+}
+
 .agenda-rows-empty {
   min-height: 32px;
 }
@@ -400,6 +413,13 @@ h3 {
 .task-check:focus-visible {
   background: var(--row-color);
   color: var(--ink);
+}
+
+.task-check.task-check-completed:disabled {
+  border-color: var(--success-text);
+  background: var(--success);
+  color: var(--ink);
+  opacity: 1;
 }
 
 .agenda-action-error {

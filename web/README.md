@@ -31,7 +31,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Enable Firebase **Anonymous Auth**. The app signs in (or reuses the browser's anonymous session), reads open tasks and event candidates for the active Home/day/week/month range, and writes compatible canonical task/event documents under:
+Enable Firebase **Anonymous Auth**. The app signs in (or reuses the browser's anonymous session), reads tasks and event candidates for the active Home/day/week/month range, and writes compatible canonical task/event documents under:
 
 ```text
 users/{uid}/tasks/{taskId}
