@@ -1,8 +1,10 @@
 # dependencies
 node_modules/
 
-# Vite
+# Vite and browser test output
 dist/
+test-results/
+playwright-report/
 
 # local environment
 .env

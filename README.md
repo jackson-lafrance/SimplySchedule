@@ -24,8 +24,8 @@ npm install
 npm run dev
 ```
 
-The web entry point is a responsive schedule shell only; it does not yet implement product workflows or persistence.
+The web client now provides a restrained Simply Lift-inspired Home/Calendar/Settings shell, agenda-focused Home, day/week/month views, progressive event creation, canonical user-scoped Firebase writes, visible-range reads, and expressive bounded recurrence. Local preview creation remains session-only.
 
 ## Firebase foundation
 
-The shared Firebase configuration, Firestore rules, indexes, emulator setup, and initial data model are documented in [`firebase/README.md`](./firebase/README.md). The backend scaffold is intentionally not wired into either client yet. See [`SIMPLY_SCHEDULE_IMPLEMENTATION_DESIGN.md`](./SIMPLY_SCHEDULE_IMPLEMENTATION_DESIGN.md) for the proposed task, subtask, calendar, event, recurrence, synchronization, milestone, risk, and decision plan.
+The shared Firebase configuration, Firestore rules, indexes, emulator setup, and canonical data model are documented in [`firebase/README.md`](./firebase/README.md). See [`SIMPLY_SCHEDULE_IMPLEMENTATION_DESIGN.md`](./SIMPLY_SCHEDULE_IMPLEMENTATION_DESIGN.md) for the broader task, subtask, synchronization, milestone, risk, and decision plan.
