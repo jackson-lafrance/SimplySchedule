@@ -274,6 +274,41 @@ test("persists tasks and flexible events through shared emulators", async () => 
     assert.equal(completedTasks.docs[0].data().status, "completed");
     assert.ok(completedTasks.docs[0].data().completedAt instanceof Timestamp);
 
+    const completedVisibleTasks = await new Promise<ScheduleTask[]>(
+      (resolve, reject) => {
+        let unsubscribe: (() => void) | undefined;
+        const timeout = setTimeout(() => {
+          unsubscribe?.();
+          reject(new Error("Timed out waiting for completed task snapshots."));
+        }, 10_000);
+        unsubscribe = subscribeToTasksInRange(
+          db,
+          user.uid,
+          range,
+          (tasks) => {
+            if (
+              tasks.some(
+                (task) => task.id === taskId && task.status === "completed",
+              )
+            ) {
+              clearTimeout(timeout);
+              unsubscribe?.();
+              resolve(tasks);
+            }
+          },
+          (error) => {
+            clearTimeout(timeout);
+            unsubscribe?.();
+            reject(error);
+          },
+        );
+      },
+    );
+    assert.equal(
+      completedVisibleTasks.find((task) => task.id === taskId)?.status,
+      "completed",
+    );
+
     const proofDay = {
       start: new Date("2026-08-11T00:00:00.000Z"),
       end: new Date("2026-08-12T00:00:00.000Z"),

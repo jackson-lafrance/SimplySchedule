@@ -131,7 +131,7 @@ test("sorts all-day entries before timed and repeating occurrences", () => {
   );
 });
 
-test("projects only open due tasks onto their agenda day", () => {
+test("keeps completed due tasks on their agenda day", () => {
   const createdAt = new Date(2026, 7, 1, 9);
   const task = (
     overrides: Partial<ScheduleTask> = {},
@@ -159,7 +159,7 @@ test("projects only open due tasks onto their agenda day", () => {
       ],
       new Date(2026, 7, 11, 12),
     ).map((item) => item.id),
-    ["task-1"],
+    ["task-1", "done"],
   );
 });
 

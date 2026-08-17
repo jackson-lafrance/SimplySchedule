@@ -94,7 +94,6 @@ export function subscribeToTasksInRange(
 ) {
   const tasksQuery = query(
     collection(db, "users", userId, "tasks"),
-    where("status", "==", "open"),
     where("dueAt", ">=", Timestamp.fromDate(range.start)),
     where("dueAt", "<", Timestamp.fromDate(range.end)),
     orderBy("dueAt", "asc"),

@@ -1,3 +1,4 @@
+import { MaterialIcons } from "@expo/vector-icons";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -123,11 +124,14 @@ export default function AgendaList({
   const renderItem = (selectedItem: SelectedItem, keyPrefix = "") => {
     const item = selectedItem.item;
     const isTask = selectedItem.type === "task";
+    const taskCompleted =
+      selectedItem.type === "task" && selectedItem.item.status === "completed";
     const timing = selectedItem.type === "task"
       ? selectedItem.item.dueAt
         ? `DUE ${timeLabel(selectedItem.item.dueAt, timeDisplay)}`
         : "NO DUE TIME"
       : eventTime(selectedItem.item, timeDisplay);
+    const displayTiming = taskCompleted ? `COMPLETED · ${timing}` : timing;
     const accentColor = scheduleColorValue(item.color);
     const textColor = scheduleColorTextValue(item.color);
     const completing = isTask && completingTaskId === item.id;
@@ -135,14 +139,24 @@ export default function AgendaList({
     return (
       <View
         key={`${keyPrefix}${selectedItem.type}-${item.id}`}
-        style={[styles.item, { borderLeftColor: accentColor }]}
+        style={[
+          styles.item,
+          taskCompleted && styles.completedItem,
+          { borderLeftColor: accentColor },
+        ]}
       >
         {selectedItem.type === "task" ? (
           <Pressable
-            accessibilityLabel={`Complete ${item.title}`}
-            accessibilityRole="button"
-            accessibilityState={{ busy: completing, disabled: completing }}
-            disabled={completing}
+            accessibilityLabel={
+              taskCompleted ? `${item.title}, completed` : `Complete ${item.title}`
+            }
+            accessibilityRole="checkbox"
+            accessibilityState={{
+              busy: completing,
+              checked: taskCompleted,
+              disabled: taskCompleted || completing,
+            }}
+            disabled={taskCompleted || completing}
             hitSlop={4}
             onPress={() => void completeTask(selectedItem.item)}
             style={({ pressed }) => [
@@ -150,16 +164,24 @@ export default function AgendaList({
               pressed && styles.pressed,
             ]}
           >
-            <View style={[styles.checkGlyph, { borderColor: textColor }]}>
+            <View
+              style={[
+                styles.checkGlyph,
+                taskCompleted && styles.completedCheckGlyph,
+                { borderColor: taskCompleted ? colors.success : textColor },
+              ]}
+            >
               {completing ? (
                 <ActivityIndicator color={textColor} size="small" />
+              ) : taskCompleted ? (
+                <MaterialIcons name="check" size={20} color={colors.inverse} />
               ) : null}
             </View>
           </Pressable>
         ) : null}
         <Pressable
           accessibilityHint="Opens item details"
-          accessibilityLabel={`${isTask ? "Task" : "Event"}, ${item.title}, ${timing}`}
+          accessibilityLabel={`${isTask ? "Task" : "Event"}, ${item.title}, ${displayTiming}`}
           accessibilityRole="button"
           onPress={() => openDetails(selectedItem)}
           style={({ pressed }) => [
@@ -167,10 +189,19 @@ export default function AgendaList({
             pressed && styles.pressed,
           ]}
         >
-          <Text style={[styles.timing, { color: textColor }]}>
-            {timing}
+          <Text
+            style={[
+              styles.timing,
+              taskCompleted && styles.completedTiming,
+              { color: taskCompleted ? colors.muted : textColor },
+            ]}
+          >
+            {displayTiming}
           </Text>
-          <Text numberOfLines={1} style={styles.title}>
+          <Text
+            numberOfLines={1}
+            style={[styles.title, taskCompleted && styles.completedTitle]}
+          >
             {item.title}
           </Text>
         </Pressable>
@@ -237,24 +268,38 @@ export default function AgendaList({
                 showsVerticalScrollIndicator={false}
                 style={styles.detailScroll}
               >
-                <Text numberOfLines={3} style={styles.detailTitle}>
+                <Text
+                  numberOfLines={3}
+                  style={[
+                    styles.detailTitle,
+                    selected.type === "task" &&
+                      selected.item.status === "completed" &&
+                      styles.completedDetailTitle,
+                  ]}
+                >
                   {selected.item.title}
                 </Text>
                 <Text style={styles.detailTiming}>
                   {selected.type === "task"
-                    ? selected.item.dueAt
-                      ? `DUE ${selected.item.dueAt.toLocaleDateString("en-US", {
-                          weekday: "long",
-                          month: "long",
-                          day: "numeric",
-                        })} · ${timeLabel(selected.item.dueAt, timeDisplay)}`
-                      : "NO DUE DATE"
+                    ? `${selected.item.status === "completed" ? "COMPLETED · " : ""}${selected.item.dueAt
+                        ? `DUE ${selected.item.dueAt.toLocaleDateString("en-US", {
+                            weekday: "long",
+                            month: "long",
+                            day: "numeric",
+                          })} · ${timeLabel(selected.item.dueAt, timeDisplay)}`
+                        : "NO DUE DATE"}`
                     : `${selected.item.startsAt.toLocaleDateString("en-US", {
                         weekday: "long",
                         month: "long",
                         day: "numeric",
                       })} · ${eventTime(selected.item, timeDisplay)}`}
                 </Text>
+                {selected.type === "task" && selected.item.status === "completed" ? (
+                  <View style={styles.completedStatus}>
+                    <MaterialIcons name="check" size={18} color={colors.inverse} />
+                    <Text style={styles.completedStatusText}>COMPLETED</Text>
+                  </View>
+                ) : null}
                 {selected.item.notes ? (
                   <Text style={styles.detailNotes}>{selected.item.notes}</Text>
                 ) : null}
@@ -268,7 +313,7 @@ export default function AgendaList({
                   {actionError}
                 </Text>
               ) : null}
-              {selected.type === "task" ? (
+              {selected.type === "task" && selected.item.status === "open" ? (
                 <Pressable
                   accessibilityRole="button"
                   accessibilityState={{
@@ -351,6 +396,9 @@ const styles = StyleSheet.create({
     borderLeftWidth: 8,
     overflow: "hidden",
   },
+  completedItem: {
+    backgroundColor: colors.surfaceMuted,
+  },
   itemMain: {
     flex: 1,
     paddingHorizontal: spacing.md,
@@ -373,6 +421,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  completedCheckGlyph: {
+    backgroundColor: colors.success,
+  },
   pressed: {
     opacity: 0.6,
   },
@@ -383,11 +434,18 @@ const styles = StyleSheet.create({
     ...typography.label,
     marginBottom: spacing.xxs,
   },
+  completedTiming: {
+    fontWeight: "900",
+  },
   title: {
     color: colors.ink,
     fontSize: 16,
     fontWeight: "900",
     textTransform: "uppercase",
+  },
+  completedTitle: {
+    color: colors.muted,
+    textDecorationLine: "line-through",
   },
   overlay: {
     flex: 1,
@@ -419,11 +477,31 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
     textTransform: "uppercase",
   },
+  completedDetailTitle: {
+    color: colors.muted,
+    textDecorationLine: "line-through",
+  },
   detailTiming: {
     ...typography.caption,
     color: colors.ink,
     lineHeight: 18,
     marginTop: spacing.sm,
+  },
+  completedStatus: {
+    alignSelf: "flex-start",
+    marginTop: spacing.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.control,
+    backgroundColor: colors.success,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xxs,
+  },
+  completedStatusText: {
+    color: colors.ink,
+    fontSize: 12,
+    fontWeight: "900",
   },
   detailNotes: {
     ...typography.caption,

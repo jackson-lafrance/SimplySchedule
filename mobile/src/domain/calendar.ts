@@ -209,7 +209,6 @@ export function tasksForDate(tasks: ScheduleTask[], date: Date) {
   return tasks
     .filter(
       (task) =>
-        task.status === "open" &&
         task.dueAt !== null &&
         localDateKey(task.dueAt) === key,
     )
