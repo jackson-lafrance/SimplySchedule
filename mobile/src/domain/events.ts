@@ -1,3 +1,5 @@
+import type { ScheduleColor } from "@/domain/scheduleColors";
+
 export type EventKind = "single" | "repeating";
 export type RecurrenceFrequency =
   | "hourly"
@@ -32,6 +34,7 @@ type EventBase = {
   id: string;
   title: string;
   notes: string;
+  color: ScheduleColor;
   startsAt: Date;
   endsAt: Date | null;
   allDay: boolean;
@@ -59,6 +62,7 @@ export type EventOccurrence = {
   occurrenceKey: string;
   title: string;
   notes: string;
+  color: ScheduleColor;
   startsAt: Date;
   endsAt: Date | null;
   allDay: boolean;
@@ -69,6 +73,7 @@ export type EventOccurrence = {
 type CreateEventBase = {
   title: string;
   notes: string;
+  color: ScheduleColor;
   startsAt: Date;
   endsAt: Date | null;
   allDay: boolean;

@@ -202,10 +202,8 @@ export default function CalendarScreen({
             <View style={styles.monthContent}>
               <MonthGrid
                 days={monthDays}
-                events={events}
                 onSelectDay={(day) => onSelectDate(day.date)}
                 selectedKey={localDateKey(selectedDate)}
-                tasks={tasks}
                 weekStartsOn={preferences.weekStartsOn}
               />
             </View>

@@ -13,6 +13,7 @@ function taskDocument(overrides: Record<string, unknown> = {}) {
   return {
     title: "  Send agenda  ",
     notes: "Attach notes.",
+    color: "yellow",
     status: "open",
     parentId: null,
     dueAt: Timestamp.fromDate(dueAt),
@@ -30,18 +31,26 @@ test("decodes canonical task persistence", () => {
   assert.equal(task.id, "task-1");
   assert.equal(task.title, "Send agenda");
   assert.equal(task.status, "open");
+  assert.equal(task.color, "yellow");
   assert.equal(task.dueAt?.toISOString(), dueAt.toISOString());
 });
 
-test("encodes exactly the canonical task fields", () => {
+test("defaults legacy tasks to the semantic task color", () => {
+  const { color: _color, ...document } = taskDocument();
+
+  assert.equal(decodeTaskDocument("legacy-task", document).color, "green");
+});
+
+test("encodes the canonical task color field", () => {
   const lifecycleTimestamp = { serverTimestamp: true };
   const document = encodeCreateTaskDocument(
-    { title: "  Send agenda  ", notes: "", dueAt },
+    { title: "  Send agenda  ", notes: "", color: "peach", dueAt },
     lifecycleTimestamp,
     12,
   );
 
   assert.deepEqual(Object.keys(document).sort(), [
+    "color",
     "completedAt",
     "createdAt",
     "dueAt",
@@ -53,6 +62,7 @@ test("encodes exactly the canonical task fields", () => {
     "updatedAt",
   ]);
   assert.equal(document.title, "Send agenda");
+  assert.equal(document.color, "peach");
   assert.equal(document.dueAt.toDate().toISOString(), dueAt.toISOString());
   assert.equal(document.createdAt, lifecycleTimestamp);
   assert.equal(document.updatedAt, lifecycleTimestamp);
@@ -66,5 +76,9 @@ test("rejects malformed task data", () => {
   assert.throws(
     () => decodeTaskDocument("task-1", taskDocument({ dueAt: "tomorrow" })),
     /dueAt must be a Firestore timestamp/,
+  );
+  assert.throws(
+    () => decodeTaskDocument("task-1", taskDocument({ color: "pink" })),
+    /invalid canonical fields/,
   );
 });

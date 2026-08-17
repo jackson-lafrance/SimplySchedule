@@ -9,8 +9,10 @@ import {
 import {
   collection,
   connectFirestoreEmulator,
+  doc,
   getDocs,
   getFirestore,
+  setDoc,
   Timestamp,
 } from "firebase/firestore";
 
@@ -61,6 +63,7 @@ function repeating(
   return {
     title,
     notes: `Emulator proof for ${title}.`,
+    color: "mauve",
     kind: "repeating",
     startsAt: start,
     endsAt: new Date(start.getTime() + 60 * 60 * 1_000),
@@ -78,6 +81,7 @@ function single(
   return {
     title,
     notes: "Visible-range query proof.",
+    color: "blue",
     kind: "single",
     startsAt: new Date(startsAt),
     endsAt: endsAt ? new Date(endsAt) : null,
@@ -166,6 +170,7 @@ test("persists tasks and flexible events through shared emulators", async () => 
       const data = eventDocument.data();
       assert.deepEqual(Object.keys(data).sort(), [
         "allDay",
+        "color",
         "createdAt",
         "endsAt",
         "kind",
@@ -218,6 +223,7 @@ test("persists tasks and flexible events through shared emulators", async () => 
     const taskId = await createTask(db, user.uid, {
       title: "Send emulator agenda",
       notes: "Task persistence proof.",
+      color: "green",
       dueAt: new Date("2026-08-11T16:30:00.000Z"),
     });
     const visibleTasks = await new Promise<ScheduleTask[]>((resolve, reject) => {
@@ -250,6 +256,7 @@ test("persists tasks and flexible events through shared emulators", async () => 
     );
     assert.equal(persistedTasks.size, 1);
     assert.deepEqual(Object.keys(persistedTasks.docs[0].data()).sort(), [
+      "color",
       "completedAt",
       "createdAt",
       "dueAt",
@@ -295,6 +302,33 @@ test("persists tasks and flexible events through shared emulators", async () => 
           (event.endsAt === null || event.endsAt > proofDay.start),
       ),
     );
+
+    const legacyTimestamp = Timestamp.fromDate(
+      new Date("2030-01-01T09:00:00.000Z"),
+    );
+    await setDoc(doc(db, "users", user.uid, "events", "legacy-web-event"), {
+      title: "Legacy web event",
+      notes: "",
+      kind: "single",
+      startsAt: legacyTimestamp,
+      endsAt: null,
+      allDay: false,
+      timeZone: "UTC",
+      recurrence: null,
+      createdAt: legacyTimestamp,
+      updatedAt: legacyTimestamp,
+    });
+    await setDoc(doc(db, "users", user.uid, "tasks", "legacy-web-task"), {
+      title: "Legacy web task",
+      notes: "",
+      status: "open",
+      parentId: null,
+      dueAt: legacyTimestamp,
+      completedAt: null,
+      position: 2,
+      createdAt: legacyTimestamp,
+      updatedAt: legacyTimestamp,
+    });
   } finally {
     await deleteApp(app);
   }

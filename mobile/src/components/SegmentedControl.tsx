@@ -51,7 +51,7 @@ export default function SegmentedControl<Option extends string | number>({
 
 const styles = StyleSheet.create({
   container: {
-    minHeight: 44,
+    height: 44,
     borderWidth: 2,
     borderColor: colors.ink,
     borderRadius: radii.control,
@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
   },
   option: {
     flex: 1,
-    minHeight: 42,
+    minHeight: 40,
     paddingHorizontal: 4,
     alignItems: "center",
     justifyContent: "center",

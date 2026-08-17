@@ -20,6 +20,7 @@ export function createTaskInputFromDraft(
   return {
     title,
     notes: draft.notes,
+    color: draft.color,
     dueAt: dateAt(
       parseDateKey(draft.date, "TASK"),
       parseTime(draft.time, "TASK"),

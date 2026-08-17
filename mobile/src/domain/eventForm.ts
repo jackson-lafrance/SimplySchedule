@@ -4,13 +4,18 @@ import type {
   RecurrenceRule,
   RecurrenceTerminationType,
 } from "@/domain/events";
-import { zonedDateTimeToDate } from "@/domain/recurrence";
+import type { ScheduleColor } from "@/domain/scheduleColors";
+import {
+  expandEventInRange,
+  zonedDateTimeToDate,
+} from "@/domain/recurrence";
 
 export type CalendarSelectorMode = "dayOfMonth" | "ordinalWeekday";
 
 export type EventDraft = {
   title: string;
   notes: string;
+  color: ScheduleColor;
   date: string;
   startTime: string;
   endTime: string;
@@ -388,6 +393,7 @@ export function createEventInputFromDraft(
   const base = {
     title,
     notes: draft.notes,
+    color: draft.color,
     startsAt,
     endsAt,
     allDay: draft.allDay,
@@ -396,6 +402,30 @@ export function createEventInputFromDraft(
   return recurrence
     ? { ...base, kind: "repeating", recurrence }
     : { ...base, kind: "single", recurrence: null };
+}
+
+export function previewEventOccurrences(
+  input: CreateEventInput,
+  maximum = 5,
+) {
+  if (input.kind !== "repeating" || maximum < 1) return [];
+  const previewEnd = new Date(input.startsAt);
+  previewEnd.setUTCFullYear(previewEnd.getUTCFullYear() + 500);
+  const lifecycleDate = new Date(input.startsAt);
+
+  return expandEventInRange(
+    {
+      ...input,
+      id: "recurrence-preview",
+      createdAt: lifecycleDate,
+      updatedAt: lifecycleDate,
+    },
+    {
+      start: new Date(input.startsAt.getTime() - 1),
+      end: previewEnd,
+    },
+    maximum,
+  ).map((occurrence) => occurrence.startsAt);
 }
 
 export function recurrenceDraftSummary(draft: EventDraft) {

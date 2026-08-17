@@ -9,7 +9,7 @@ The mobile app is an Expo/React Native agenda, task, and calendar client designe
 - **Settings** — only week start, default calendar view, and 12/24-hour display.
 - **+ schedule** — the single full-width primary action, matching SimplyLift's Start Workout placement and behavior.
 
-Task and event rows use distinct semantic colors and expose only a name plus essential timing; tapping a row opens its details card. Quick task creation needs a title and due time. Quick event creation needs a title, start anchor, and time. Notes, all-day behavior, and recurrence stay behind **More Options**.
+Task and event rows expose only a name plus essential timing, with a selectable Neovim-inspired color persisted as a stable Firebase palette ID. Tasks can be completed directly from the weekly agenda. Tapping the row opens its details card. Quick task creation needs a title and due time. Quick event creation needs a title, date, and time. Notes, all-day behavior, and recurrence stay behind **More Options**, while repeating events retain a compact preview of upcoming dates.
 
 The recurrence builder supports arbitrary 1–99 intervals across hours, days, weeks, months, and years; multiple weekdays; numeric month days; first through fifth or last ordinal weekdays; yearly month selectors; inclusive through-date and occurrence-count bounds; and never-ending rules. Canonical seeds align to the first matching occurrence. Calendar units preserve local wall time through DST; hourly rules use elapsed time.
 
@@ -48,7 +48,7 @@ EXPO_PUBLIC_FIREBASE_USE_EMULATORS=true
 EXPO_PUBLIC_FIREBASE_SEED_EMULATOR=true
 ```
 
-The Simulator reaches host emulators at `127.0.0.1`. Event and task creation use generated document IDs, exact canonical field sets, and Firestore server timestamps. Completing a task preserves `createdAt` and sets server values for `completedAt` and `updatedAt`.
+The Simulator reaches host emulators at `127.0.0.1`. Event and task creation use generated document IDs, canonical shared fields, validated color IDs, and Firestore server timestamps. Completing a task preserves `createdAt` and sets server values for `completedAt` and `updatedAt`. Legacy/web documents without color remain readable with semantic defaults.
 
 Visible-range subscriptions cover open due tasks, point events, overlapping duration/all-day events, and repeating candidates. Recurrence expansion remains local, emits stable `<eventId>@<ISO-start>` keys, and is capped at 2,000 visible occurrences.
 

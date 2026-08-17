@@ -1,5 +1,5 @@
 import { MaterialIcons } from "@expo/vector-icons";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Dimensions,
@@ -19,6 +19,7 @@ import SegmentedControl from "@/components/SegmentedControl";
 import { useSchedule } from "@/context/useSchedule";
 import {
   createEventInputFromDraft,
+  previewEventOccurrences,
   recurrenceDraftSummary,
   type EventDraft,
 } from "@/domain/eventForm";
@@ -26,6 +27,13 @@ import type {
   RecurrenceFrequency,
   RecurrenceTerminationType,
 } from "@/domain/events";
+import {
+  DEFAULT_EVENT_COLOR,
+  DEFAULT_TASK_COLOR,
+  scheduleColorValue,
+  SCHEDULE_COLORS,
+  type ScheduleColor,
+} from "@/domain/scheduleColors";
 import { createTaskInputFromDraft } from "@/domain/taskForm";
 import type { TaskDraft } from "@/domain/tasks";
 import { colors, radii, spacing, typography } from "@/theme";
@@ -94,6 +102,7 @@ function initialEventDraft(date: string): EventDraft {
   return {
     title: "",
     notes: "",
+    color: DEFAULT_EVENT_COLOR,
     date,
     startTime: "09:00",
     endTime: "10:00",
@@ -114,7 +123,13 @@ function initialEventDraft(date: string): EventDraft {
 }
 
 function initialTaskDraft(date: string): TaskDraft {
-  return { title: "", notes: "", date, time: "09:00" };
+  return {
+    title: "",
+    notes: "",
+    color: DEFAULT_TASK_COLOR,
+    date,
+    time: "09:00",
+  };
 }
 
 function Chip({
@@ -156,6 +171,50 @@ function FieldLabel({ children }: { children: string }) {
   return <Text style={styles.fieldLabel}>{children}</Text>;
 }
 
+function ColorPicker({
+  value,
+  onChange,
+}: {
+  value: ScheduleColor;
+  onChange: (value: ScheduleColor) => void;
+}) {
+  return (
+    <View style={styles.field}>
+      <FieldLabel>COLOR</FieldLabel>
+      <View
+        accessibilityLabel="Schedule color"
+        accessibilityRole="radiogroup"
+        style={styles.colorPicker}
+      >
+        {SCHEDULE_COLORS.map((color) => {
+          const selected = color.id === value;
+          return (
+            <Pressable
+              accessibilityLabel={color.label}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: selected }}
+              key={color.id}
+              onPress={() => onChange(color.id)}
+              style={({ pressed }) => [
+                styles.colorOption,
+                selected && styles.colorOptionSelected,
+                pressed && styles.pressed,
+              ]}
+            >
+              <View
+                style={[
+                  styles.colorSwatch,
+                  { backgroundColor: scheduleColorValue(color.id) },
+                ]}
+              />
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 export default function CreateItemSheet({
   visible,
   initialDate,
@@ -182,6 +241,32 @@ export default function CreateItemSheet({
   const slide = useRef(new Animated.Value(height)).current;
   const insets = useSafeAreaInsets();
   const timeZone = deviceTimeZone();
+  const previewDates = useMemo(() => {
+    if (!eventDraft.recurrenceEnabled) return [];
+    try {
+      const input = createEventInputFromDraft(
+        {
+          ...eventDraft,
+          title: eventDraft.title.trim() || "Recurrence preview",
+        },
+        timeZone,
+      );
+      return previewEventOccurrences(input);
+    } catch {
+      return [];
+    }
+  }, [eventDraft, timeZone]);
+  const previewFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        hour: eventDraft.allDay ? undefined : "numeric",
+        minute: eventDraft.allDay ? undefined : "2-digit",
+      }),
+    [eventDraft.allDay],
+  );
 
   useEffect(() => {
     if (!visible) return;
@@ -289,7 +374,7 @@ export default function CreateItemSheet({
         >
           <View style={styles.header}>
             <Text maxFontSizeMultiplier={1.4} style={styles.title}>
-              ADD ITEM
+              SCHEDULE
             </Text>
             <Pressable
               accessibilityLabel="Close add item"
@@ -309,8 +394,8 @@ export default function CreateItemSheet({
               setErrorMessage(null);
             }}
             options={[
-              { value: "task", label: "TASK" },
-              { value: "event", label: "EVENT" },
+              { value: "task", label: "TO DO" },
+              { value: "event", label: "CALENDAR" },
             ]}
             value={itemType}
           />
@@ -323,7 +408,7 @@ export default function CreateItemSheet({
             {itemType === "task" ? (
               <>
                 <View style={styles.field}>
-                  <FieldLabel>TASK NAME</FieldLabel>
+                  <FieldLabel>TITLE</FieldLabel>
                   <TextInput
                     accessibilityLabel="Task name"
                     autoFocus
@@ -363,9 +448,13 @@ export default function CreateItemSheet({
                     />
                   </View>
                 </View>
+                <ColorPicker
+                  onChange={(value) => updateTask("color", value)}
+                  value={taskDraft.color}
+                />
                 {advanced ? (
                   <View style={styles.field}>
-                    <FieldLabel>NOTES · OPTIONAL</FieldLabel>
+                    <FieldLabel>NOTES</FieldLabel>
                     <TextInput
                       accessibilityLabel="Task notes"
                       maxLength={5_000}
@@ -382,7 +471,7 @@ export default function CreateItemSheet({
             ) : (
               <>
                 <View style={styles.field}>
-                  <FieldLabel>EVENT NAME</FieldLabel>
+                  <FieldLabel>TITLE</FieldLabel>
                   <TextInput
                     accessibilityLabel="Event name"
                     autoFocus
@@ -437,6 +526,11 @@ export default function CreateItemSheet({
                   </View>
                 ) : null}
 
+                <ColorPicker
+                  onChange={(value) => updateEvent("color", value)}
+                  value={eventDraft.color}
+                />
+
                 {advanced ? (
                   <>
                     <Pressable
@@ -458,7 +552,7 @@ export default function CreateItemSheet({
                       <Text style={styles.optionTitle}>ALL DAY</Text>
                     </Pressable>
                     <View style={styles.field}>
-                      <FieldLabel>NOTES · OPTIONAL</FieldLabel>
+                      <FieldLabel>NOTES</FieldLabel>
                       <TextInput
                         accessibilityLabel="Event notes"
                         maxLength={5_000}
@@ -689,6 +783,20 @@ export default function CreateItemSheet({
                           </>
                         ) : null}
 
+                        {previewDates.length > 0 ? (
+                          <View style={styles.preview}>
+                            <FieldLabel>UPCOMING</FieldLabel>
+                            {previewDates.map((date) => (
+                              <Text
+                                key={date.toISOString()}
+                                style={styles.previewDate}
+                              >
+                                {previewFormatter.format(date).toUpperCase()}
+                              </Text>
+                            ))}
+                          </View>
+                        ) : null}
+
                         <FieldLabel>ENDS</FieldLabel>
                         <SegmentedControl
                           accessibilityLabel="Repeat ends"
@@ -801,7 +909,7 @@ export default function CreateItemSheet({
                 numberOfLines={1}
                 style={styles.saveText}
               >
-                {saving ? "SAVING…" : `ADD ${itemType.toUpperCase()}`}
+                {saving ? "SAVING…" : "SAVE"}
               </Text>
             </Pressable>
           </View>
@@ -976,10 +1084,8 @@ const styles = StyleSheet.create({
   },
   moreButton: {
     minHeight: 48,
-    borderWidth: 2,
-    borderStyle: "dashed",
-    borderColor: colors.ink,
     borderRadius: radii.control,
+    backgroundColor: colors.surfaceMuted,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -992,9 +1098,8 @@ const styles = StyleSheet.create({
   },
   optionRow: {
     minHeight: 52,
-    borderWidth: 2,
-    borderColor: colors.ink,
     borderRadius: radii.control,
+    backgroundColor: colors.surfaceMuted,
     padding: spacing.sm,
     flexDirection: "row",
     alignItems: "center",
@@ -1026,10 +1131,9 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   recurrenceCard: {
-    borderWidth: 2,
-    borderColor: colors.ink,
-    borderRadius: radii.card,
-    padding: spacing.md,
+    borderTopWidth: 2,
+    borderTopColor: colors.ink,
+    paddingTop: spacing.md,
     gap: spacing.sm,
   },
   sectionTitle: {
@@ -1062,6 +1166,30 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: spacing.xxs,
   },
+  colorPicker: {
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.xxs,
+  },
+  colorOption: {
+    width: 42,
+    height: 42,
+    borderWidth: 2,
+    borderColor: "transparent",
+    borderRadius: radii.control,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  colorOptionSelected: {
+    borderColor: colors.ink,
+  },
+  colorSwatch: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+  },
   chip: {
     minWidth: 38,
     minHeight: 36,
@@ -1083,6 +1211,18 @@ const styles = StyleSheet.create({
   },
   selectedChipText: {
     color: colors.inverse,
+  },
+  preview: {
+    padding: spacing.sm,
+    borderRadius: radii.control,
+    backgroundColor: colors.surfaceMuted,
+    gap: spacing.xxs,
+  },
+  previewDate: {
+    color: colors.ink,
+    fontSize: 11,
+    fontWeight: "800",
+    fontFamily: "ui-monospace",
   },
   error: {
     borderWidth: 2,

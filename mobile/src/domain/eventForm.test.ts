@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   alignDateForRecurrence,
   createEventInputFromDraft,
+  previewEventOccurrences,
   recurrenceDraftSummary,
   type EventDraft,
 } from "@/domain/eventForm";
@@ -14,6 +15,7 @@ function draft(overrides: Partial<EventDraft> = {}): EventDraft {
   return {
     title: "  Release check  ",
     notes: "Bring the launch notes.",
+    color: "mauve",
     date: "2026-08-11",
     startTime: "09:00",
     endTime: "10:00",
@@ -49,6 +51,7 @@ test("keeps ordinary event creation fast and canonical", () => {
 
   assert.equal(input.kind, "single");
   assert.equal(input.title, "Release check");
+  assert.equal(input.color, "mauve");
   assert.equal(input.startsAt.toISOString(), "2026-08-11T09:00:00.000Z");
   assert.equal(input.endsAt?.toISOString(), "2026-08-11T10:00:00.000Z");
   assert.equal(input.recurrence, null);
@@ -186,6 +189,25 @@ test("supports inclusive through-date and bounded occurrence count", () => {
     "2026-08-15T23:59:59.999Z",
   );
   assert.equal(counted.recurrence.termination.count, 7);
+});
+
+test("previews useful upcoming recurrence dates", () => {
+  const input = repeating({
+    frequency: "weekly",
+    weekdays: [2, 5],
+    terminationType: "afterOccurrences",
+    occurrenceCount: "4",
+  });
+
+  assert.deepEqual(
+    previewEventOccurrences(input).map((date) => date.toISOString()),
+    [
+      "2026-08-11T09:00:00.000Z",
+      "2026-08-14T09:00:00.000Z",
+      "2026-08-18T09:00:00.000Z",
+      "2026-08-21T09:00:00.000Z",
+    ],
+  );
 });
 
 test("summarizes flexible recurrence without hiding its cadence", () => {

@@ -23,6 +23,10 @@ import type {
   SingleEvent,
   VisibleRange,
 } from "@/domain/events";
+import {
+  DEFAULT_EVENT_COLOR,
+  isScheduleColor,
+} from "@/domain/scheduleColors";
 
 const FREQUENCIES: RecurrenceFrequency[] = [
   "hourly",
@@ -265,10 +269,18 @@ export function decodeEventDocument(
     throw new Error(`Event ${id} allDay must be a boolean.`);
   }
 
+  const eventColor = value.color === undefined
+    ? DEFAULT_EVENT_COLOR
+    : value.color;
+  if (!isScheduleColor(eventColor)) {
+    throw new Error(`Event ${id} has an invalid color.`);
+  }
+
   const base = {
     id,
     title: requiredString(value, "title", 200),
     notes: optionalString(value, "notes", 5_000),
+    color: eventColor,
     startsAt: dateValue(value.startsAt, "startsAt"),
     endsAt: nullableDateValue(value.endsAt, "endsAt"),
     allDay,
@@ -405,6 +417,7 @@ export function encodeCreateEventDocument(
   return {
     title: input.title.trim(),
     notes: input.notes,
+    color: input.color,
     kind: input.kind,
     startsAt: Timestamp.fromDate(input.startsAt),
     endsAt: input.endsAt ? Timestamp.fromDate(input.endsAt) : null,

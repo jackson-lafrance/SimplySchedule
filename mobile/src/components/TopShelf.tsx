@@ -134,12 +134,6 @@ export default function TopShelf({
                   <Text style={styles.statusLabel}>STATUS</Text>
                   <Text style={styles.statusValue}>{statusLabel}</Text>
                 </View>
-                <View style={styles.statusRow}>
-                  <Text style={styles.statusLabel}>TIMEZONE</Text>
-                  <Text numberOfLines={1} style={styles.statusValue}>
-                    {Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"}
-                  </Text>
-                </View>
               </View>
 
               <Text style={styles.version}>SIMPLYSCHEDULE V0.1.0</Text>

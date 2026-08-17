@@ -15,6 +15,7 @@ function eventDocument(overrides: Record<string, unknown> = {}) {
   return {
     title: "  Weekly plan  ",
     notes: "Set priorities.",
+    color: "blue",
     kind: "single",
     startsAt: Timestamp.fromDate(startsAt),
     endsAt: Timestamp.fromDate(endsAt),
@@ -51,15 +52,23 @@ test("decodes the shared single-event document contract", () => {
   assert.equal(event.id, "event-1");
   assert.equal(event.title, "Weekly plan");
   assert.equal(event.kind, "single");
+  assert.equal(event.color, "blue");
   assert.equal(event.startsAt.toISOString(), startsAt.toISOString());
   assert.equal(event.recurrence, null);
 });
 
-test("encodes exactly ten canonical fields with Firestore timestamp values", () => {
+test("defaults legacy events to the semantic event color", () => {
+  const { color: _color, ...document } = eventDocument();
+
+  assert.equal(decodeEventDocument("legacy-event", document).color, "mauve");
+});
+
+test("encodes the canonical color field with Firestore timestamp values", () => {
   const lifecycleTimestamp = { serverTimestamp: true };
   const input: CreateEventInput = {
     title: "  Third Friday review  ",
     notes: "Monthly release review.",
+    color: "teal",
     kind: "repeating",
     startsAt: new Date("2026-08-21T16:00:00.000Z"),
     endsAt: new Date("2026-08-21T17:00:00.000Z"),
@@ -85,6 +94,7 @@ test("encodes exactly ten canonical fields with Firestore timestamp values", () 
 
   assert.deepEqual(Object.keys(document).sort(), [
     "allDay",
+    "color",
     "createdAt",
     "endsAt",
     "kind",
@@ -96,6 +106,7 @@ test("encodes exactly ten canonical fields with Firestore timestamp values", () 
     "updatedAt",
   ]);
   assert.equal(document.title, "Third Friday review");
+  assert.equal(document.color, "teal");
   assert.equal(document.startsAt.toDate().toISOString(), input.startsAt.toISOString());
   assert.equal(document.endsAt?.toDate().toISOString(), input.endsAt?.toISOString());
   assert.equal(
@@ -172,6 +183,13 @@ test("rejects selector combinations that diverge from the shared contract", () =
         }),
       ),
     /selectors do not match/,
+  );
+});
+
+test("rejects colors outside the shared palette", () => {
+  assert.throws(
+    () => decodeEventDocument("event-1", eventDocument({ color: "pink" })),
+    /invalid color/,
   );
 });
 

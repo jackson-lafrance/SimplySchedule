@@ -19,12 +19,13 @@ Both calendar clients use Firebase Anonymous Auth when their platform Firebase c
 
 ## Event document
 
-Every event has exactly these fields:
+Every new color-aware event has these fields. Existing clients may omit `color`; readers and rules preserve that compatibility:
 
 | Field | Firestore type | Contract |
 | --- | --- | --- |
 | `title` | string | Trimmed display title, 1–200 characters. |
 | `notes` | string | Plain text, empty when unused, at most 5,000 characters. |
+| `color` | string | Optional on legacy/web-compatible documents; new color-aware clients write one of `blue`, `teal`, `green`, `yellow`, `peach`, `red`, or `mauve`. Missing values display as `mauve`. |
 | `kind` | string | `single` or `repeating`. |
 | `startsAt` | timestamp | Timed start instant, or local midnight in `timeZone` for an all-day event. For a series, this is the recurrence anchor and lower bound. Daily/hourly rules include it; selector-based rules produce their first matching occurrence on or after it. |
 | `endsAt` | timestamp or null | Exclusive end. Must be after `startsAt` when present. Required for all-day events; null means a timed point event. For a series, `endsAt - startsAt` is each occurrence's duration. |
@@ -33,6 +34,22 @@ Every event has exactly these fields:
 | `recurrence` | map or null | Null for `single`; the versioned rule below for `repeating`. |
 | `createdAt` | timestamp | Lifecycle timestamp. Event-creation clients should set this with a server timestamp and preserve it on updates. |
 | `updatedAt` | timestamp | Lifecycle timestamp. Event-creation clients should refresh it with a server timestamp on mutation. |
+
+### Schedule color palette
+
+Color IDs are stable Firebase values shared by tasks and events. Clients render them with this Neovim-inspired palette:
+
+| ID | Hex |
+| --- | --- |
+| `blue` | `#89B4FA` |
+| `teal` | `#94E2D5` |
+| `green` | `#A6E3A1` |
+| `yellow` | `#F9E2AF` |
+| `peach` | `#FAB387` |
+| `red` | `#F38BA8` |
+| `mauve` | `#CBA6F7` |
+
+Firestore stores the ID rather than the display hex so both clients can render the same semantic selection. Legacy task/event documents without `color` remain valid and use green/mauve defaults respectively.
 
 ### Date semantics
 
@@ -135,4 +152,4 @@ Each platform domain expander clips all point/duration occurrences to the same h
 - Missing/incomplete platform Firebase configuration selects an explicit `LOCAL PREVIEW` with the same in-memory single-event fixtures. Created preview events last for the current browser/app session and are never uploaded.
 - Web uses `VITE_FIREBASE_*`; iOS uses `EXPO_PUBLIC_FIREBASE_*`. Both target the Firebase project selected by `.firebaserc` and the emulator ports in `firebase.json`.
 - When each platform's `*_FIREBASE_USE_EMULATORS=true` and `*_FIREBASE_SEED_EMULATOR=true`, an empty anonymous user's event collection receives the same minimal preview events. This is development-only proof data.
-- Both clients create canonical single and repeating documents with generated document IDs and server values for both lifecycle timestamps. Their strict encoders write exactly the documented fields. Edit/delete and occurrence exceptions remain outside this phase.
+- Both clients create canonical single and repeating documents with generated document IDs and server values for both lifecycle timestamps. Color-aware clients also persist a validated palette ID; clients that omit it remain compatible. Edit/delete and occurrence exceptions remain outside this phase.

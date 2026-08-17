@@ -217,6 +217,7 @@ function occurrenceFromStart(
     occurrenceKey: key,
     title: event.title,
     notes: event.notes,
+    color: event.color,
     startsAt,
     endsAt,
     allDay: event.allDay,

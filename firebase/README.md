@@ -54,6 +54,7 @@ A task document has the following fields:
 | --- | --- | --- |
 | `title` | string | Required display title, 1–200 characters. |
 | `notes` | string | Optional content, stored as an empty string when unused. |
+| `color` | string | Optional for legacy/web compatibility; color-aware clients persist a validated Neovim-inspired palette ID, with missing values displayed as green. |
 | `status` | `open \| completed` | Current task state. |
 | `parentId` | string \| null | Parent task ID for a subtask; `null` means a top-level task. |
 | `dueAt` | timestamp \| null | Optional due date/time. |
@@ -67,7 +68,7 @@ Subtasks stay in the same collection so list and calendar queries share one repo
 
 The canonical cross-platform event schema, timestamp/all-day semantics, versioned recurrence grammar, required pattern encodings, and platform query shapes are defined in [`CALENDAR_EVENT_CONTRACT.md`](./CALENDAR_EVENT_CONTRACT.md). That contract is shared by the React web and React Native iOS clients.
 
-An event has `title`, `notes`, `kind`, `startsAt`, `endsAt`, `allDay`, `timeZone`, `recurrence`, `createdAt`, and `updatedAt`. `kind` is `single` or `repeating`; single events use `recurrence: null`. Version 1 recurrence supports hourly, daily, weekly, monthly, and yearly intervals plus numeric-day and ordinal-weekday selectors. It can represent first-of-month, third-Friday, every-other-day, every-three-days, and every-five-hours without materialized occurrence documents.
+An event has `title`, `notes`, optional `color`, `kind`, `startsAt`, `endsAt`, `allDay`, `timeZone`, `recurrence`, `createdAt`, and `updatedAt`. `kind` is `single` or `repeating`; single events use `recurrence: null`. Version 1 recurrence supports hourly, daily, weekly, monthly, and yearly intervals plus numeric-day and ordinal-weekday selectors. It can represent first-of-month, third-Friday, every-other-day, every-three-days, and every-five-hours without materialized occurrence documents.
 
 Calendar, list, and agenda views are projections over these documents and should not become separate sources of truth. The indexes cover sibling ordering, task status/due-date filtering, and event kind/start-date filtering; add an index only when a concrete query requires one.
 

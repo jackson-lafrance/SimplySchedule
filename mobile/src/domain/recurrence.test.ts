@@ -38,6 +38,7 @@ function repeating(
     id: "series-1",
     title: "Recurring focus",
     notes: "",
+    color: "mauve",
     kind: "repeating",
     startsAt,
     endsAt:
@@ -409,6 +410,7 @@ test("includes a single duration event overlapping a visible boundary", () => {
     id: "overnight",
     title: "Overnight release",
     notes: "",
+    color: "blue",
     kind: "single",
     startsAt,
     endsAt: new Date("2026-08-01T00:30:00.000Z"),

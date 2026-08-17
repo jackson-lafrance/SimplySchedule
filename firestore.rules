@@ -10,6 +10,10 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    function validScheduleColor(value) {
+      return value in ['blue', 'teal', 'green', 'yellow', 'peach', 'red', 'mauve'];
+    }
+
     function validTask(data) {
       return data.keys().hasAll([
           'title',
@@ -31,8 +35,10 @@ service cloud.firestore {
           'completedAt',
           'position',
           'createdAt',
-          'updatedAt'
+          'updatedAt',
+          'color'
         ])
+        && (!data.keys().hasAny(['color']) || validScheduleColor(data.color))
         && data.title is string
         && data.title.size() > 0
         && data.title.size() <= 200
@@ -192,8 +198,10 @@ service cloud.firestore {
           'timeZone',
           'recurrence',
           'createdAt',
-          'updatedAt'
+          'updatedAt',
+          'color'
         ])
+        && (!data.keys().hasAny(['color']) || validScheduleColor(data.color))
         && data.title is string
         && data.title.size() > 0
         && data.title.size() <= 200

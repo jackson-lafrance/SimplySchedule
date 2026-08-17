@@ -1,13 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import {
-  eventsForDate,
-  tasksForDate,
-  type CalendarDay,
-} from "@/domain/calendar";
-import type { EventOccurrence } from "@/domain/events";
+import type { CalendarDay } from "@/domain/calendar";
 import type { WeekStart } from "@/domain/preferences";
-import type { ScheduleTask } from "@/domain/tasks";
 import { colors, radii, spacing, typography } from "@/theme";
 
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
@@ -20,15 +14,11 @@ const accessibilityDateFormatter = new Intl.DateTimeFormat("en-US", {
 
 export default function MonthGrid({
   days,
-  events,
-  tasks,
   selectedKey,
   weekStartsOn,
   onSelectDay,
 }: {
   days: CalendarDay[];
-  events: EventOccurrence[];
-  tasks: ScheduleTask[];
   selectedKey: string;
   weekStartsOn: WeekStart;
   onSelectDay: (day: CalendarDay) => void;
@@ -51,13 +41,10 @@ export default function MonthGrid({
       </View>
       <View style={styles.grid}>
         {days.map((day) => {
-          const count =
-            eventsForDate(events, day.date).length +
-            tasksForDate(tasks, day.date).length;
           const selected = day.key === selectedKey;
           return (
             <Pressable
-              accessibilityLabel={`${accessibilityDateFormatter.format(day.date)}, ${count} items`}
+              accessibilityLabel={accessibilityDateFormatter.format(day.date)}
               accessibilityRole="button"
               accessibilityState={{ selected }}
               key={day.key}

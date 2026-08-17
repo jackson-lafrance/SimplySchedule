@@ -15,6 +15,10 @@ import {
 } from "firebase/firestore";
 
 import type { VisibleRange } from "@/domain/events";
+import {
+  DEFAULT_TASK_COLOR,
+  isScheduleColor,
+} from "@/domain/scheduleColors";
 import type { CreateTaskInput, ScheduleTask } from "@/domain/tasks";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -41,6 +45,9 @@ export function decodeTaskDocument(id: string, value: unknown): ScheduleTask {
   const status = value.status;
   const parentId = value.parentId;
   const position = value.position;
+  const taskColor = value.color === undefined
+    ? DEFAULT_TASK_COLOR
+    : value.color;
   if (
     typeof title !== "string" ||
     !title.trim() ||
@@ -50,7 +57,8 @@ export function decodeTaskDocument(id: string, value: unknown): ScheduleTask {
     (status !== "open" && status !== "completed") ||
     (parentId !== null && typeof parentId !== "string") ||
     typeof position !== "number" ||
-    !Number.isFinite(position)
+    !Number.isFinite(position) ||
+    !isScheduleColor(taskColor)
   ) {
     throw new Error(`Task ${id} has invalid canonical fields.`);
   }
@@ -59,6 +67,7 @@ export function decodeTaskDocument(id: string, value: unknown): ScheduleTask {
     id,
     title: title.trim(),
     notes,
+    color: taskColor,
     status,
     parentId,
     dueAt: nullableDate(value.dueAt, "dueAt"),
@@ -116,6 +125,7 @@ export function encodeCreateTaskDocument(
   return {
     title: input.title.trim(),
     notes: input.notes,
+    color: input.color,
     status: "open" as const,
     parentId: null,
     dueAt: Timestamp.fromDate(input.dueAt),

@@ -1,3 +1,4 @@
+import { MaterialIcons } from "@expo/vector-icons";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -16,6 +17,10 @@ import {
 } from "@/domain/calendar";
 import type { EventOccurrence } from "@/domain/events";
 import type { TimeDisplay } from "@/domain/preferences";
+import {
+  scheduleColorTextValue,
+  scheduleColorValue,
+} from "@/domain/scheduleColors";
 import type { ScheduleTask } from "@/domain/tasks";
 import { colors, radii, spacing, typography } from "@/theme";
 
@@ -75,7 +80,7 @@ export default function AgendaList({
   onCurrentDateLayout?: (offset: number) => void;
 }) {
   const [selected, setSelected] = useState<SelectedItem | null>(null);
-  const [completingTask, setCompletingTask] = useState(false);
+  const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const sections = dates.map((date) => ({
     date,
@@ -95,61 +100,84 @@ export default function AgendaList({
     setSelected(item);
   };
   const closeDetails = () => {
-    if (completingTask) return;
+    if (completingTaskId) return;
     setActionError(null);
     setSelected(null);
   };
-  const completeSelectedTask = async () => {
-    if (!selected || selected.type !== "task") return;
+  const completeTask = async (task: ScheduleTask) => {
     setActionError(null);
-    setCompletingTask(true);
+    setCompletingTaskId(task.id);
     try {
-      await onCompleteTask(selected.item.id);
-      setSelected(null);
+      await onCompleteTask(task.id);
+      if (selected?.type === "task" && selected.item.id === task.id) {
+        setSelected(null);
+      }
     } catch (error) {
       console.error("Could not complete task", error);
+      setSelected({ type: "task", item: task });
       setActionError("THE TASK COULD NOT BE COMPLETED. TRY AGAIN.");
     } finally {
-      setCompletingTask(false);
+      setCompletingTaskId(null);
     }
   };
 
   const renderItem = (selectedItem: SelectedItem, keyPrefix = "") => {
-    let timing: string;
-    if (selectedItem.type === "task") {
-      timing = selectedItem.item.dueAt
-        ? `DUE ${timeLabel(selectedItem.item.dueAt, timeDisplay)}`
-        : "NO DUE TIME";
-    } else {
-      timing = eventTime(selectedItem.item, timeDisplay);
-    }
     const item = selectedItem.item;
     const isTask = selectedItem.type === "task";
+    const timing = selectedItem.type === "task"
+      ? selectedItem.item.dueAt
+        ? `DUE ${timeLabel(selectedItem.item.dueAt, timeDisplay)}`
+        : "NO DUE TIME"
+      : eventTime(selectedItem.item, timeDisplay);
+    const accentColor = scheduleColorValue(item.color);
+    const textColor = scheduleColorTextValue(item.color);
+    const completing = isTask && completingTaskId === item.id;
+
     return (
-      <Pressable
-        accessibilityHint="Opens item details"
-        accessibilityLabel={`${isTask ? "Task" : "Event"}, ${item.title}, ${timing}`}
-        accessibilityRole="button"
+      <View
         key={`${keyPrefix}${selectedItem.type}-${item.id}`}
-        onPress={() => openDetails(selectedItem)}
-        style={({ pressed }) => [
-          styles.item,
-          isTask ? styles.taskItem : styles.eventItem,
-          pressed && styles.pressed,
-        ]}
+        style={[styles.item, { borderLeftColor: accentColor }]}
       >
-        <Text
-          style={[
-            styles.timing,
-            isTask ? styles.taskText : styles.eventText,
+        {selectedItem.type === "task" ? (
+          <Pressable
+            accessibilityLabel={`Complete ${item.title}`}
+            accessibilityRole="button"
+            accessibilityState={{ busy: completing, disabled: completing }}
+            disabled={completing}
+            hitSlop={4}
+            onPress={() => void completeTask(selectedItem.item)}
+            style={({ pressed }) => [
+              styles.checkButton,
+              pressed && styles.pressed,
+            ]}
+          >
+            <View style={[styles.checkGlyph, { borderColor: textColor }]}>
+              {completing ? (
+                <ActivityIndicator color={textColor} size="small" />
+              ) : (
+                <MaterialIcons name="check" size={20} color={textColor} />
+              )}
+            </View>
+          </Pressable>
+        ) : null}
+        <Pressable
+          accessibilityHint="Opens item details"
+          accessibilityLabel={`${isTask ? "Task" : "Event"}, ${item.title}, ${timing}`}
+          accessibilityRole="button"
+          onPress={() => openDetails(selectedItem)}
+          style={({ pressed }) => [
+            styles.itemMain,
+            pressed && styles.pressed,
           ]}
         >
-          {timing}
-        </Text>
-        <Text numberOfLines={1} style={styles.title}>
-          {item.title}
-        </Text>
-      </Pressable>
+          <Text style={[styles.timing, { color: textColor }]}>
+            {timing}
+          </Text>
+          <Text numberOfLines={1} style={styles.title}>
+            {item.title}
+          </Text>
+        </Pressable>
+      </View>
     );
   };
 
@@ -171,21 +199,23 @@ export default function AgendaList({
               }
               style={styles.section}
             >
-              <Text accessibilityRole="header" style={styles.sectionTitle}>
+              <Text
+                accessibilityRole="header"
+                style={[
+                  styles.sectionTitle,
+                  sectionKey === currentKey && styles.currentSectionTitle,
+                ]}
+              >
                 {sectionTitle.format(section.date).toUpperCase()}
               </Text>
               <View style={styles.sectionItems}>
-                {section.items.length > 0 ? (
-                  section.items.map((item) => renderItem(item, `${sectionKey}-`))
-                ) : (
-                  <Text style={styles.sectionEmpty}>NOTHING SCHEDULED</Text>
+                {section.items.map((item) =>
+                  renderItem(item, `${sectionKey}-`),
                 )}
               </View>
             </View>
           );
         })
-      ) : items.length === 0 ? (
-        <Text style={styles.empty}>NOTHING SCHEDULED</Text>
       ) : (
         items.map((item) => renderItem(item))
       )}
@@ -198,22 +228,18 @@ export default function AgendaList({
       >
         <View style={styles.overlay}>
           {selected ? (
-            <View accessibilityViewIsModal style={styles.detailCard}>
+            <View
+              accessibilityViewIsModal
+              style={[
+                styles.detailCard,
+                { borderTopColor: scheduleColorValue(selected.item.color) },
+              ]}
+            >
               <ScrollView
                 contentContainerStyle={styles.detailContent}
                 showsVerticalScrollIndicator={false}
                 style={styles.detailScroll}
               >
-                <Text
-                  style={[
-                    styles.detailType,
-                    selected.type === "task"
-                      ? styles.taskText
-                      : styles.eventText,
-                  ]}
-                >
-                  {selected.type === "task" ? "TASK" : "EVENT"}
-                </Text>
                 <Text numberOfLines={3} style={styles.detailTitle}>
                   {selected.item.title}
                 </Text>
@@ -236,9 +262,7 @@ export default function AgendaList({
                   <Text style={styles.detailNotes}>{selected.item.notes}</Text>
                 ) : null}
                 {selected.type === "event" && selected.item.isRepeating ? (
-                  <Text style={styles.detailMeta}>
-                    REPEATING · {selected.item.timeZone.toUpperCase()}
-                  </Text>
+                  <Text style={styles.detailMeta}>REPEATING</Text>
                 ) : null}
               </ScrollView>
 
@@ -251,18 +275,18 @@ export default function AgendaList({
                 <Pressable
                   accessibilityRole="button"
                   accessibilityState={{
-                    busy: completingTask,
-                    disabled: completingTask,
+                    busy: completingTaskId === selected.item.id,
+                    disabled: completingTaskId === selected.item.id,
                   }}
-                  disabled={completingTask}
-                  onPress={() => void completeSelectedTask()}
+                  disabled={completingTaskId === selected.item.id}
+                  onPress={() => void completeTask(selected.item)}
                   style={({ pressed }) => [
                     styles.primaryButton,
                     pressed && styles.primaryPressed,
-                    completingTask && styles.disabled,
+                    completingTaskId === selected.item.id && styles.disabled,
                   ]}
                 >
-                  {completingTask ? (
+                  {completingTaskId === selected.item.id ? (
                     <ActivityIndicator color={colors.inverse} />
                   ) : (
                     <Text style={styles.primaryText}>MARK COMPLETE</Text>
@@ -271,12 +295,12 @@ export default function AgendaList({
               ) : null}
               <Pressable
                 accessibilityRole="button"
-                disabled={completingTask}
+                disabled={completingTaskId !== null}
                 onPress={closeDetails}
                 style={({ pressed }) => [
                   styles.doneButton,
                   pressed && styles.pressed,
-                  completingTask && styles.disabled,
+                  completingTaskId !== null && styles.disabled,
                 ]}
               >
                 <Text style={styles.doneText}>DONE</Text>
@@ -301,6 +325,14 @@ const styles = StyleSheet.create({
   section: {
     gap: spacing.sm,
   },
+  currentSectionTitle: {
+    alignSelf: "flex-start",
+    borderRadius: 6,
+    backgroundColor: colors.ink,
+    color: colors.inverse,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xxs,
+  },
   sectionTitle: {
     color: colors.ink,
     fontSize: 18,
@@ -311,28 +343,38 @@ const styles = StyleSheet.create({
   sectionItems: {
     gap: spacing.sm,
   },
-  sectionEmpty: {
-    color: colors.muted,
-    fontSize: 13,
-    fontWeight: "800",
-    paddingVertical: spacing.sm,
-  },
   item: {
     minHeight: 72,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
     borderWidth: 2,
     borderColor: colors.ink,
     borderRadius: radii.card,
     backgroundColor: colors.background,
-    justifyContent: "center",
+    flexDirection: "row",
+    alignItems: "stretch",
     borderLeftWidth: 8,
+    overflow: "hidden",
   },
-  taskItem: {
-    borderLeftColor: colors.success,
+  itemMain: {
+    flex: 1,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    justifyContent: "center",
   },
-  eventItem: {
-    borderLeftColor: colors.accent,
+  checkButton: {
+    width: 52,
+    minHeight: 68,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRightWidth: 1,
+    borderRightColor: colors.divider,
+  },
+  checkGlyph: {
+    width: 30,
+    height: 30,
+    borderWidth: 2,
+    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
   },
   pressed: {
     opacity: 0.6,
@@ -344,24 +386,11 @@ const styles = StyleSheet.create({
     ...typography.label,
     marginBottom: spacing.xxs,
   },
-  taskText: {
-    color: colors.success,
-  },
-  eventText: {
-    color: colors.accent,
-  },
   title: {
     color: colors.ink,
     fontSize: 16,
     fontWeight: "900",
     textTransform: "uppercase",
-  },
-  empty: {
-    color: colors.muted,
-    fontSize: 14,
-    fontWeight: "800",
-    textAlign: "center",
-    paddingVertical: spacing.xxl,
   },
   overlay: {
     flex: 1,
@@ -375,6 +404,7 @@ const styles = StyleSheet.create({
     maxHeight: "85%",
     padding: spacing.xl,
     borderWidth: 2,
+    borderTopWidth: 8,
     borderColor: colors.ink,
     borderRadius: 12,
     backgroundColor: colors.background,
@@ -384,10 +414,6 @@ const styles = StyleSheet.create({
   },
   detailContent: {
     paddingBottom: spacing.xs,
-  },
-  detailType: {
-    ...typography.label,
-    marginBottom: spacing.xs,
   },
   detailTitle: {
     color: colors.ink,
