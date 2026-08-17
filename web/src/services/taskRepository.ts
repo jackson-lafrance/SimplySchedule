@@ -40,7 +40,17 @@ function dateValue(value: unknown, field: string): Date {
 }
 
 function nullableDate(value: unknown, field: string) {
-  return value === null ? null : dateValue(value, field);
+  return value === null || value === undefined ? null : dateValue(value, field);
+}
+
+function taskColor(value: unknown) {
+  if (value === undefined) {
+    return DEFAULT_TASK_COLOR;
+  }
+  if (isScheduleColor(value)) {
+    return value;
+  }
+  throw new Error("Task color is invalid.");
 }
 
 export function decodeTaskDocument(id: string, value: unknown): ScheduleTask {
@@ -72,7 +82,7 @@ export function decodeTaskDocument(id: string, value: unknown): ScheduleTask {
     dueAt: nullableDate(value.dueAt, "dueAt"),
     completedAt: nullableDate(value.completedAt, "completedAt"),
     position,
-    color: isScheduleColor(value.color) ? value.color : DEFAULT_TASK_COLOR,
+    color: taskColor(value.color),
     createdAt: dateValue(value.createdAt, "createdAt"),
     updatedAt: dateValue(value.updatedAt, "updatedAt"),
   };
@@ -131,7 +141,7 @@ export function encodeCreateTaskDocument(
     dueAt: Timestamp.fromDate(input.dueAt),
     completedAt: null,
     position,
-    color: input.color,
+    color: input.color ?? DEFAULT_TASK_COLOR,
     createdAt: lifecycleTimestamp,
     updatedAt: lifecycleTimestamp,
   };
@@ -142,11 +152,25 @@ export async function createTask(
   userId: string,
   input: CreateTaskInput,
 ) {
+  const now = new Date();
+  const position = Date.now();
+  decodeTaskDocument("new-task", {
+    title: input.title,
+    notes: input.notes,
+    status: "open",
+    parentId: null,
+    dueAt: input.dueAt,
+    completedAt: null,
+    position,
+    color: input.color,
+    createdAt: now,
+    updatedAt: now,
+  });
   const reference = doc(collection(db, "users", userId, "tasks"));
   const lifecycleTimestamp = serverTimestamp();
   await setDoc(
     reference,
-    encodeCreateTaskDocument(input, lifecycleTimestamp, Date.now()),
+    encodeCreateTaskDocument(input, lifecycleTimestamp, position),
   );
   return reference.id;
 }

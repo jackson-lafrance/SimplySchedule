@@ -133,5 +133,5 @@ The web domain expander clips all point/duration occurrences to the same half-op
 
 - Missing/incomplete platform Firebase configuration selects an explicit `LOCAL PREVIEW` with the same in-memory single-event fixtures. Web-created preview events last for the browser session and are never uploaded.
 - Web uses `VITE_FIREBASE_*`; iOS uses `EXPO_PUBLIC_FIREBASE_*`. Both target the Firebase project selected by `.firebaserc` and the emulator ports in `firebase.json`.
-- When each platform's `*_FIREBASE_USE_EMULATORS=true` and `*_FIREBASE_SEED_EMULATOR=true`, an empty anonymous user's event collection receives the same minimal preview events. This is development-only proof data.
+- When each platform's `*_FIREBASE_USE_EMULATORS=true` and `*_FIREBASE_SEED_EMULATOR=true`, an empty anonymous user's event collection receives the same minimal preview events. The web proof mode also seeds minimal tasks when its visible task collection is empty. This is development-only proof data.
 - The web client creates canonical single and repeating documents with generated document IDs and server values for both lifecycle timestamps. It writes the optional shared palette key; existing and mobile documents without it remain valid and decode with a default. Edit/delete and occurrence exceptions remain outside this phase.

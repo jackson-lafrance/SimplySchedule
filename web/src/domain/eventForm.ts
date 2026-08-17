@@ -21,6 +21,7 @@ export type EventDraft = {
   startTime: string;
   endTime: string;
   allDay: boolean;
+  hasEndTime: boolean;
   color: ScheduleColor;
   repeatFrequency: RepeatFrequency;
   interval: string;
@@ -317,7 +318,7 @@ export function createEventInputFromDraft(
 
   const selectedDate = parseDateKey(draft.date);
   let startsAt: Date;
-  let endsAt: Date;
+  let endsAt: Date | null;
 
   if (draft.allDay) {
     startsAt = dateAt(selectedDate, { hour: 0, minute: 0 }, timeZone);
@@ -328,8 +329,10 @@ export function createEventInputFromDraft(
     );
   } else {
     startsAt = dateAt(selectedDate, parseTime(draft.startTime), timeZone);
-    endsAt = dateAt(selectedDate, parseTime(draft.endTime), timeZone);
-    if (endsAt <= startsAt) {
+    endsAt = draft.hasEndTime
+      ? dateAt(selectedDate, parseTime(draft.endTime), timeZone)
+      : null;
+    if (endsAt !== null && endsAt <= startsAt) {
       throw new Error("END TIME MUST BE AFTER START TIME.");
     }
   }

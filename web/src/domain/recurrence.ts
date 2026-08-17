@@ -184,12 +184,28 @@ function occurrenceFromStart(
   event: CalendarEvent,
   startsAt: Date,
 ): EventOccurrence {
-  const duration = event.endsAt
-    ? event.endsAt.getTime() - event.startsAt.getTime()
-    : null;
-  const endsAt = duration === null
-    ? null
-    : new Date(startsAt.getTime() + duration);
+  let endsAt: Date | null = null;
+  if (event.endsAt) {
+    if (event.allDay) {
+      const seedStart = zonedDateTimeParts(event.startsAt, event.timeZone);
+      const seedEnd = zonedDateTimeParts(event.endsAt, event.timeZone);
+      const durationDays = Math.max(
+        1,
+        Math.round(
+          (localDayNumber(seedEnd) - localDayNumber(seedStart)),
+        ),
+      );
+      endsAt = zonedDateTimeToDate(
+        addLocalDays(zonedDateTimeParts(startsAt, event.timeZone), durationDays),
+        event.timeZone,
+      );
+    } else {
+      endsAt = new Date(
+        startsAt.getTime() +
+          (event.endsAt.getTime() - event.startsAt.getTime()),
+      );
+    }
+  }
   const repeating = event.kind === "repeating";
   const key = repeating ? occurrenceKey(event.id, startsAt) : event.id;
 

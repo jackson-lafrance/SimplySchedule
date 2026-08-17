@@ -66,8 +66,10 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
   const [visibleRange, setVisibleRangeState] = useState(() =>
     visibleRangeForMonth(new Date()),
   );
+  const visibleRangeRef = useRef(visibleRange);
   const [loadAttempt, setLoadAttempt] = useState(0);
   const userIdRef = useRef<string | null>(null);
+  const userReadyRef = useRef<Promise<string> | null>(null);
   const seededEmulatorRef = useRef(false);
 
   useEffect(() => {
@@ -79,6 +81,10 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
     let failed = false;
     let eventsReady = false;
     let tasksReady = false;
+    let eventsFirstSnapshot = false;
+    let tasksFirstSnapshot = false;
+    let eventsEmpty = false;
+    let tasksEmpty = false;
     const unsubscribes: (() => void)[] = [];
 
     const fail = (error: unknown) => {
@@ -112,31 +118,48 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
       }));
     };
     const seedEmulatorSchedule = (userId: string) => {
-      if (!configuredClient.seedEmulator || seededEmulatorRef.current) {
+      if (
+        !configuredClient.seedEmulator ||
+        seededEmulatorRef.current ||
+        (!eventsFirstSnapshot && !tasksFirstSnapshot) ||
+        (!eventsEmpty && !tasksEmpty)
+      ) {
         return false;
       }
       seededEmulatorRef.current = true;
       void Promise.all([
         seedEmulatorEvents(configuredClient.db, userId, createDemoEvents()),
         seedEmulatorTasks(configuredClient.db, userId, createDemoTasks()),
-      ]).catch(fail);
+      ]).catch((error) => {
+        seededEmulatorRef.current = false;
+        fail(error);
+      });
       return true;
     };
 
-    void getOrCreateScheduleUser(configuredClient.auth)
-      .then((user) => {
+    const userReady = getOrCreateScheduleUser(configuredClient.auth).then(
+      (user) => user.uid,
+    );
+    userReadyRef.current = userReady;
+
+    void userReady
+      .then((userId) => {
         if (!active) {
           return;
         }
-        userIdRef.current = user.uid;
+        userIdRef.current = userId;
 
         unsubscribes.push(
           subscribeToEventsInRange(
             configuredClient.db,
-            user.uid,
+            userId,
             visibleRange,
             (events) => {
-              if (events.length === 0 && seedEmulatorSchedule(user.uid)) {
+              if (!eventsFirstSnapshot) {
+                eventsFirstSnapshot = true;
+                eventsEmpty = events.length === 0;
+              }
+              if (seedEmulatorSchedule(userId)) {
                 return;
               }
               markReady("events", events);
@@ -145,10 +168,14 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
           ),
           subscribeToTasksInRange(
             configuredClient.db,
-            user.uid,
+            userId,
             visibleRange,
             (tasks) => {
-              if (tasks.length === 0 && seedEmulatorSchedule(user.uid)) {
+              if (!tasksFirstSnapshot) {
+                tasksFirstSnapshot = true;
+                tasksEmpty = tasks.length === 0;
+              }
+              if (seedEmulatorSchedule(userId)) {
                 return;
               }
               markReady("tasks", tasks);
@@ -166,7 +193,16 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
   }, [loadAttempt, visibleRange]);
 
   const setVisibleRange = useCallback((range: VisibleRange) => {
-    setVisibleRangeState((current) => (sameRange(current, range) ? current : range));
+    if (sameRange(visibleRangeRef.current, range)) {
+      return;
+    }
+    visibleRangeRef.current = range;
+    setState((current) => ({
+      ...current,
+      status: "loading",
+      errorMessage: null,
+    }));
+    setVisibleRangeState(range);
   }, []);
 
   const createEvent = useCallback(async (input: CreateEventInput) => {
@@ -184,7 +220,8 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
       return id;
     }
 
-    const userId = userIdRef.current;
+    const userId =
+      userIdRef.current ?? (await userReadyRef.current);
     if (!userId) {
       throw new Error("THE SCHEDULE IS STILL CONNECTING. TRY AGAIN.");
     }
@@ -214,10 +251,12 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
       }));
       return id;
     }
-    if (!userIdRef.current) {
+    const userId =
+      userIdRef.current ?? (await userReadyRef.current);
+    if (!userId) {
       throw new Error("THE SCHEDULE IS STILL CONNECTING. TRY AGAIN.");
     }
-    return persistTask(configuredClient.db, userIdRef.current, input);
+    return persistTask(configuredClient.db, userId, input);
   }, []);
 
   const completeTask = useCallback(async (taskId: string) => {

@@ -104,6 +104,16 @@ function nullableDateValue(value: unknown, field: string) {
   return value === null ? null : dateValue(value, field);
 }
 
+function colorValue(value: unknown, fallback: typeof DEFAULT_EVENT_COLOR, entity: string) {
+  if (value === undefined) {
+    return fallback;
+  }
+  if (isScheduleColor(value)) {
+    return value;
+  }
+  throw new Error(`${entity} color is invalid.`);
+}
+
 function nullableInteger(
   value: unknown,
   field: string,
@@ -277,7 +287,7 @@ export function decodeEventDocument(
     endsAt: nullableDateValue(value.endsAt, "endsAt"),
     allDay,
     timeZone: timeZoneString(value),
-    color: isScheduleColor(value.color) ? value.color : DEFAULT_EVENT_COLOR,
+    color: colorValue(value.color, DEFAULT_EVENT_COLOR, `Event ${id}`),
     createdAt: dateValue(value.createdAt, "createdAt"),
     updatedAt: dateValue(value.updatedAt, "updatedAt"),
   };

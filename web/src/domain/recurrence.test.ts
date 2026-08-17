@@ -212,6 +212,72 @@ describe("bounded recurrence expansion", () => {
     );
   });
 
+  it("keeps repeating all-day boundaries in event-local calendar time across DST", () => {
+    const timeZone = "America/Los_Angeles";
+    const startsAt = zonedDateTimeToDate(
+      {
+        year: 2026,
+        month: 3,
+        day: 7,
+        hour: 0,
+        minute: 0,
+        second: 0,
+        millisecond: 0,
+      },
+      timeZone,
+    );
+    const endsAt = zonedDateTimeToDate(
+      {
+        year: 2026,
+        month: 3,
+        day: 8,
+        hour: 0,
+        minute: 0,
+        second: 0,
+        millisecond: 0,
+      },
+      timeZone,
+    );
+    const event = repeating(rule({ frequency: "daily" }), {
+      startsAt,
+      endsAt,
+      allDay: true,
+      timeZone,
+    });
+    const occurrences = expandEventInRange(event, {
+      start: startsAt,
+      end: zonedDateTimeToDate(
+        {
+          year: 2026,
+          month: 3,
+          day: 10,
+          hour: 0,
+          minute: 0,
+          second: 0,
+          millisecond: 0,
+        },
+        timeZone,
+      ),
+    });
+    const dstOccurrence = occurrences[1];
+
+    expect(zonedDateTimeParts(dstOccurrence.startsAt, timeZone)).toMatchObject({
+      year: 2026,
+      month: 3,
+      day: 8,
+      hour: 0,
+    });
+    expect(zonedDateTimeParts(dstOccurrence.endsAt!, timeZone)).toMatchObject({
+      year: 2026,
+      month: 3,
+      day: 9,
+      hour: 0,
+    });
+    expect(
+      dstOccurrence.endsAt!.getTime() - dstOccurrence.startsAt.getTime(),
+    ).toBe(23 * 60 * 60 * 1_000);
+  });
+
   it("expands every five hours as elapsed hourly intervals", () => {
     const event = repeating(rule({ frequency: "hourly", interval: 5 }), {
       startsAt: new Date("2026-08-11T00:00:00.000Z"),

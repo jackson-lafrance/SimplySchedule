@@ -215,6 +215,23 @@ test("creates an event quickly and discloses expressive recurrence", async ({ pa
   await createFiveHourlyEvent(page, "Browser recurrence proof");
 });
 
+test("creates a timed point event without requiring an end", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "+ SCHEDULE" }).click();
+  await page.getByLabel("Title").fill("Point event proof");
+  await page.getByLabel("Start date").fill(localDateKey());
+  await page.getByLabel("No end time").check();
+  await page.getByRole("button", { name: "Save event" }).click();
+
+  await expect(page.getByText("EVENT SAVED.", { exact: true })).toBeVisible();
+  const row = page.locator(".agenda-row-event").filter({
+    hasText: "Point event proof",
+  });
+  await expect(row).toBeVisible();
+  await expect(row).toContainText("9:00");
+  await expect(row).not.toContainText("–");
+});
+
 test("keeps modal sheets keyboard-safe and confirms dirty cancellation", async ({
   page,
 }) => {

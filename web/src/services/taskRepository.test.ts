@@ -55,6 +55,12 @@ describe("Firestore task decoding", () => {
     expect(document.dueAt.toDate()).toEqual(dueAt);
   });
 
+  it("accepts a task with an explicitly unscheduled due value", () => {
+    const task = decodeTaskDocument("task-1", taskDocument({ dueAt: undefined }));
+
+    expect(task.dueAt).toBeNull();
+  });
+
   it("rejects malformed task data", () => {
     expect(() =>
       decodeTaskDocument("task-1", taskDocument({ status: "maybe" })),
@@ -62,5 +68,8 @@ describe("Firestore task decoding", () => {
     expect(() =>
       decodeTaskDocument("task-1", taskDocument({ dueAt: "tomorrow" })),
     ).toThrow("dueAt must be a Firestore timestamp");
+    expect(() =>
+      decodeTaskDocument("task-1", taskDocument({ color: "purple" })),
+    ).toThrow("Task color is invalid");
   });
 });

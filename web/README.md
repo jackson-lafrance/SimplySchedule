@@ -7,7 +7,7 @@ The web client is a Vite/React/TypeScript schedule in Simply Lift's restrained v
 - **Settings** — aligned week-start/default-view toggles and data status;
 - one persistent **+ SCHEDULE** action and a compact profile/data panel.
 
-The unified create sheet switches cleanly between tasks and events, offers a shared Neovim-inspired color palette, and keeps notes behind a compact disclosure. Recurrence supports arbitrary 1–99 intervals over hours, days, weeks, months, or years; weekday sets; numeric or last month dates; ordinal weekdays such as first Friday; yearly month selectors; independent start anchors; and never, inclusive through-date, or bounded occurrence-count termination.
+The unified create sheet switches cleanly between tasks and events, supports timed point events without an end time, offers a shared Neovim-inspired color palette, and keeps notes behind a compact disclosure. Recurrence supports arbitrary 1–99 intervals over hours, days, weeks, months, or years; weekday sets; numeric or last month dates; ordinal weekdays such as first Friday; yearly month selectors; independent start anchors; and never, inclusive through-date, or bounded occurrence-count termination.
 
 The canonical web/iOS data model is [`../firebase/CALENDAR_EVENT_CONTRACT.md`](../firebase/CALENDAR_EVENT_CONTRACT.md).
 
@@ -38,7 +38,7 @@ users/{uid}/tasks/{taskId}
 users/{uid}/events/{eventId}
 ```
 
-Point events, duration events that overlap a range boundary, and repeating seeds use separate snapshot queries. Calculated occurrences are local projections and are never stored as documents. A configured app shows `FIREBASE LIVE`; authentication, query, and write failures remain visible instead of silently falling back to preview data.
+Point events, duration events that overlap a range boundary, and repeating seeds use separate snapshot queries. Calculated occurrences are local projections and are never stored as documents. A configured app shows `FIREBASE` in the navigation shelf and `FIREBASE SYNC` in the profile panel; authentication, query, and write failures remain visible instead of silently falling back to preview data.
 
 ## Run against the local Firebase emulators
 
@@ -61,7 +61,7 @@ From the repository root, start Auth and Firestore:
 npx firebase-tools emulators:start --only auth,firestore
 ```
 
-Then run `npm run dev` from `web/`. When the initial anonymous user's visible collections are empty, `VITE_FIREBASE_SEED_EMULATOR=true` writes the minimal preview events and tasks. Seeding is guarded by emulator mode and happens at most once per app session.
+Then run `npm run dev` from `web/`. When an initial anonymous user's visible event or task collection is empty, `VITE_FIREBASE_SEED_EMULATOR=true` writes the minimal preview events and tasks. Seeding is guarded by emulator mode and happens at most once per app session.
 
 ## Verification
 

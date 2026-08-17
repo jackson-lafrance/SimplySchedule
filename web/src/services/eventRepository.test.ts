@@ -165,4 +165,10 @@ describe("Firestore event decoding", () => {
       ),
     ).toThrow("cannot have recurrence");
   });
+
+  it("rejects an unknown event color instead of silently changing its meaning", () => {
+    expect(() =>
+      decodeEventDocument("event-1", singleDocument({ color: "purple" })),
+    ).toThrow("Event event-1 color is invalid");
+  });
 });

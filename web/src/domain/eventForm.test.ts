@@ -16,6 +16,7 @@ function draft(overrides: Partial<EventDraft> = {}): EventDraft {
     startTime: "09:00",
     endTime: "10:00",
     allDay: false,
+    hasEndTime: true,
     color: "mauve",
     repeatFrequency: "none",
     interval: "1",
@@ -155,6 +156,16 @@ describe("event creation normalization", () => {
 
     expect(input.startsAt.toISOString()).toBe("2026-08-11T09:00:00.000Z");
     expect(input.recurrence?.dayOfMonth).toBe(1);
+  });
+
+  it("allows a timed point event without an end time", () => {
+    const input = createEventInputFromDraft(
+      draft({ hasEndTime: false }),
+      "UTC",
+    );
+
+    expect(input.kind).toBe("single");
+    expect(input.endsAt).toBeNull();
   });
 
   it("stores an all-day event with exclusive local date boundaries", () => {

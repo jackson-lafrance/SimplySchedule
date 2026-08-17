@@ -49,6 +49,7 @@ function initialDraft(date: string): EventDraft {
     startTime: "09:00",
     endTime: "10:00",
     allDay: false,
+    hasEndTime: true,
     color: DEFAULT_EVENT_COLOR,
     repeatFrequency: "none",
     interval: "1",
@@ -366,14 +367,28 @@ export default function CreateEventScreen({
                 />
               </label>
               {mode === "event" ? (
-                <label className="toggle-field">
-                  <input
-                    checked={draft.allDay}
-                    onChange={(event) => update("allDay", event.target.checked)}
-                    type="checkbox"
-                  />
-                  <span>All day</span>
-                </label>
+                <>
+                  <label className="toggle-field">
+                    <input
+                      checked={draft.allDay}
+                      onChange={(event) => update("allDay", event.target.checked)}
+                      type="checkbox"
+                    />
+                    <span>All day</span>
+                  </label>
+                  {!draft.allDay ? (
+                    <label className="toggle-field">
+                      <input
+                        checked={!draft.hasEndTime}
+                        onChange={(event) =>
+                          update("hasEndTime", !event.target.checked)
+                        }
+                        type="checkbox"
+                      />
+                      <span>No end time</span>
+                    </label>
+                  ) : null}
+                </>
               ) : null}
             </div>
 
@@ -400,15 +415,17 @@ export default function CreateEventScreen({
                     value={draft.startTime}
                   />
                 </label>
-                <label className="form-field">
-                  <span>Ends</span>
-                  <input
-                    onChange={(event) => update("endTime", event.target.value)}
-                    required
-                    type="time"
-                    value={draft.endTime}
-                  />
-                </label>
+                {draft.hasEndTime ? (
+                  <label className="form-field">
+                    <span>Ends</span>
+                    <input
+                      onChange={(event) => update("endTime", event.target.value)}
+                      required
+                      type="time"
+                      value={draft.endTime}
+                    />
+                  </label>
+                ) : null}
               </div>
             ) : null}
 
