@@ -54,12 +54,12 @@ A task document has the following fields:
 | --- | --- | --- |
 | `title` | string | Required display title, 1–200 characters. |
 | `notes` | string | Optional content, stored as an empty string when unused. |
-| `color` | string | Optional for legacy/web compatibility; color-aware clients persist a validated Neovim-inspired palette ID, with missing values displayed as green. |
 | `status` | `open \| completed` | Current task state. |
 | `parentId` | string \| null | Parent task ID for a subtask; `null` means a top-level task. |
 | `dueAt` | timestamp \| null | Optional due date/time. |
 | `completedAt` | timestamp \| null | Completion timestamp, when applicable. |
 | `position` | number | Ordering value within a task list or sibling group. |
+| `color` | string (optional) | Shared Neovim-inspired palette key; missing values use the green task default. |
 | `createdAt` / `updatedAt` | timestamp | Server-managed lifecycle timestamps. |
 
 Subtasks stay in the same collection so list and calendar queries share one repository. The iOS agenda queries open tasks by the visible `dueAt` range, creates top-level tasks with `parentId: null`, and uses server timestamps when completing them. The rules verify ownership and shape but cannot prove that `parentId` exists or prevent cycles; mutations that alter a hierarchy should use a transaction in the client repository.
@@ -68,7 +68,7 @@ Subtasks stay in the same collection so list and calendar queries share one repo
 
 The canonical cross-platform event schema, timestamp/all-day semantics, versioned recurrence grammar, required pattern encodings, and platform query shapes are defined in [`CALENDAR_EVENT_CONTRACT.md`](./CALENDAR_EVENT_CONTRACT.md). That contract is shared by the React web and React Native iOS clients.
 
-An event has `title`, `notes`, optional `color`, `kind`, `startsAt`, `endsAt`, `allDay`, `timeZone`, `recurrence`, `createdAt`, and `updatedAt`. `kind` is `single` or `repeating`; single events use `recurrence: null`. Version 1 recurrence supports hourly, daily, weekly, monthly, and yearly intervals plus numeric-day and ordinal-weekday selectors. It can represent first-of-month, third-Friday, every-other-day, every-three-days, and every-five-hours without materialized occurrence documents.
+An event has `title`, `notes`, `kind`, `startsAt`, `endsAt`, `allDay`, `timeZone`, `recurrence`, `createdAt`, and `updatedAt`, plus an optional backward-compatible `color` palette key. Missing color uses the mauve event default. `kind` is `single` or `repeating`; single events use `recurrence: null`. Version 1 recurrence supports hourly, daily, weekly, monthly, and yearly intervals plus numeric-day and ordinal-weekday selectors. It can represent first-of-month, third-Friday, every-other-day, every-three-days, and every-five-hours without materialized occurrence documents.
 
 Calendar, list, and agenda views are projections over these documents and should not become separate sources of truth. The indexes cover sibling ordering, task status/due-date filtering, and event kind/start-date filtering; add an index only when a concrete query requires one.
 
@@ -85,4 +85,4 @@ Not included yet:
 - Event editing/deletion, account screens, or an offline outbox.
 - Occurrence exceptions, task hierarchy mutation logic, reminders, or Cloud Functions.
 
-Both clients initialize Firebase when their platform environment is complete, authenticate an anonymous user, subscribe to user-scoped visible-range event candidates, write exact canonical event documents with server lifecycle timestamps, and expand recurrence locally. iOS additionally subscribes to due tasks and performs canonical task creation/completion. See [`../web/README.md`](../web/README.md) and [`../mobile/README.md`](../mobile/README.md) for run instructions.
+Both clients initialize Firebase when their platform environment is complete, authenticate an anonymous user, subscribe to user-scoped visible-range tasks and event candidates, write compatible canonical task/event documents with server lifecycle timestamps and shared color keys, and expand recurrence locally. Both support task creation/completion. See [`../web/README.md`](../web/README.md) and [`../mobile/README.md`](../mobile/README.md) for run instructions.

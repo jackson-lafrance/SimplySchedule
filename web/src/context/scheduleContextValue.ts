@@ -5,7 +5,7 @@ import type {
   CreateEventInput,
   VisibleRange,
 } from "@/domain/events";
-import type { ScheduleTask } from "@/domain/tasks";
+import type { CreateTaskInput, ScheduleTask } from "@/domain/tasks";
 
 export type ScheduleStatus = "loading" | "ready" | "error";
 export type ScheduleSource = "firebase" | "preview";
@@ -23,6 +23,8 @@ export type ScheduleContextValue = ScheduleState & {
   visibleRange: VisibleRange;
   setVisibleRange: (range: VisibleRange) => void;
   createEvent: (input: CreateEventInput) => Promise<string>;
+  createTask: (input: CreateTaskInput) => Promise<string>;
+  completeTask: (taskId: string) => Promise<void>;
   retry: () => void;
 };
 

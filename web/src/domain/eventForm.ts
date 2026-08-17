@@ -1,3 +1,4 @@
+import type { ScheduleColor } from "@/domain/colors";
 import type {
   CalendarEvent,
   CreateEventInput,
@@ -20,6 +21,7 @@ export type EventDraft = {
   startTime: string;
   endTime: string;
   allDay: boolean;
+  color: ScheduleColor;
   repeatFrequency: RepeatFrequency;
   interval: string;
   daysOfWeek: number[];
@@ -340,6 +342,7 @@ export function createEventInputFromDraft(
     endsAt,
     allDay: draft.allDay,
     timeZone,
+    color: draft.color,
   };
   const input: CreateEventInput = recurrence
     ? { ...base, kind: "repeating", recurrence }

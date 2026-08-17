@@ -15,13 +15,18 @@ import { visibleRangeForMonth } from "@/domain/calendar";
 import { createDemoEvents } from "@/domain/demoEvents";
 import { createDemoTasks } from "@/domain/demoTasks";
 import type { CreateEventInput, VisibleRange } from "@/domain/events";
+import type { CreateTaskInput } from "@/domain/tasks";
 import { getFirebaseClient, getOrCreateScheduleUser } from "@/lib/firebase";
 import {
   createEvent as persistEvent,
   seedEmulatorEvents,
   subscribeToEventsInRange,
 } from "@/services/eventRepository";
-import { subscribeToTasksInRange } from "@/services/taskRepository";
+import {
+  completeTask as persistTaskCompletion,
+  createTask as persistTask,
+  subscribeToTasksInRange,
+} from "@/services/taskRepository";
 
 const configuredClient = getFirebaseClient();
 const previewEvents = createDemoEvents();
@@ -179,6 +184,50 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
     return persistEvent(configuredClient.db, userId, input);
   }, []);
 
+  const createTask = useCallback(async (input: CreateTaskInput) => {
+    if (!configuredClient) {
+      const now = new Date();
+      const id = globalThis.crypto?.randomUUID?.() ?? `preview-task-${now.getTime()}`;
+      setState((current) => ({
+        ...current,
+        tasks: [
+          ...current.tasks,
+          {
+            ...input,
+            id,
+            status: "open",
+            parentId: null,
+            completedAt: null,
+            position: now.getTime(),
+            createdAt: now,
+            updatedAt: now,
+          },
+        ],
+        lastUpdatedAt: now,
+      }));
+      return id;
+    }
+    if (!userIdRef.current) {
+      throw new Error("THE SCHEDULE IS STILL CONNECTING. TRY AGAIN.");
+    }
+    return persistTask(configuredClient.db, userIdRef.current, input);
+  }, []);
+
+  const completeTask = useCallback(async (taskId: string) => {
+    if (!configuredClient) {
+      setState((current) => ({
+        ...current,
+        tasks: current.tasks.filter((task) => task.id !== taskId),
+        lastUpdatedAt: new Date(),
+      }));
+      return;
+    }
+    if (!userIdRef.current) {
+      throw new Error("THE SCHEDULE IS STILL CONNECTING. TRY AGAIN.");
+    }
+    await persistTaskCompletion(configuredClient.db, userIdRef.current, taskId);
+  }, []);
+
   const retry = useCallback(() => {
     if (!configuredClient) {
       return;
@@ -198,9 +247,19 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
       visibleRange,
       setVisibleRange,
       createEvent,
+      createTask,
+      completeTask,
       retry,
     }),
-    [createEvent, retry, setVisibleRange, state, visibleRange],
+    [
+      completeTask,
+      createEvent,
+      createTask,
+      retry,
+      setVisibleRange,
+      state,
+      visibleRange,
+    ],
   );
 
   return (

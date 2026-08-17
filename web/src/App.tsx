@@ -25,6 +25,7 @@ import {
   type WeekStart,
 } from "@/domain/calendar";
 import type { CalendarView, CreateEventInput } from "@/domain/events";
+import type { CreateTaskInput } from "@/domain/tasks";
 import { expandEventsInRange } from "@/domain/recurrence";
 
 type AppSection = "home" | "calendar" | "settings";
@@ -120,7 +121,9 @@ export default function App() {
     source,
     errorMessage,
     lastUpdatedAt,
+    completeTask,
     createEvent,
+    createTask,
     setVisibleRange,
     retry,
   } = useSchedule();
@@ -216,6 +219,21 @@ export default function App() {
     setCreatingEvent(false);
   };
 
+  const saveTask = async (input: CreateTaskInput) => {
+    await createTask(input);
+    setSelectedDate(
+      new Date(
+        input.dueAt.getFullYear(),
+        input.dueAt.getMonth(),
+        input.dueAt.getDate(),
+        12,
+      ),
+    );
+    setSaveMessage("TASK SAVED.");
+    setCreatingEvent(false);
+    setActiveSection("home");
+  };
+
   const openCreateEvent = () => {
     setSaveMessage(null);
     setCreatingEvent(true);
@@ -240,7 +258,6 @@ export default function App() {
         >
           <Icon name="profile" />
           <span>Profile</span>
-          <i className={`sync-dot sync-dot-${status}`} aria-hidden="true" />
         </button>
       </header>
 
@@ -287,6 +304,7 @@ export default function App() {
 
           {activeSection === "home" ? (
             <HomeView
+              completeTask={completeTask}
               occurrences={occurrences}
               tasks={tasks}
               today={today}
@@ -332,7 +350,6 @@ export default function App() {
                     ←
                   </button>
                   <div>
-                    <p className="eyebrow">Viewing</p>
                     <h2>
                       {titleForRange(calendarView, selectedDate, weekStartsOn)}
                     </h2>
@@ -358,9 +375,6 @@ export default function App() {
                         <p className="eyebrow">Agenda</p>
                         <h2>{fullDateFormatter.format(selectedDate)}</h2>
                       </div>
-                      <span className="section-count">
-                        {selectedEvents.length + selectedTasks.length}
-                      </span>
                     </div>
                     <AgendaRows
                       events={selectedEvents}
@@ -371,6 +385,7 @@ export default function App() {
 
                 {calendarView === "week" ? (
                   <WeekView
+                    completeTask={completeTask}
                     days={weekDays}
                     tasks={tasks}
                     onSelectDay={(date) => {
@@ -396,9 +411,6 @@ export default function App() {
                           <p className="eyebrow">Selected day</p>
                           <h2>{fullDateFormatter.format(selectedDate)}</h2>
                         </div>
-                        <span className="section-count">
-                          {selectedEvents.length + selectedTasks.length}
-                        </span>
                       </div>
                       <AgendaRows
                         events={selectedEvents}
@@ -430,7 +442,8 @@ export default function App() {
             activeSection === "calendar" ? selectedDate : today,
           )}
           onCancel={() => setCreatingEvent(false)}
-          onSave={saveEvent}
+          onSaveEvent={saveEvent}
+          onSaveTask={saveTask}
         />
       ) : null}
 

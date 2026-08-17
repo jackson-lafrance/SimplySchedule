@@ -62,6 +62,7 @@ describe("Firestore event creation encoding", () => {
       endsAt: new Date("2026-08-21T17:00:00.000Z"),
       allDay: false,
       timeZone: "America/Los_Angeles",
+      color: "blue",
       recurrence: {
         version: 1,
         frequency: "monthly",
@@ -82,6 +83,7 @@ describe("Firestore event creation encoding", () => {
 
     expect(Object.keys(document).sort()).toEqual([
       "allDay",
+      "color",
       "createdAt",
       "endsAt",
       "kind",
@@ -93,6 +95,7 @@ describe("Firestore event creation encoding", () => {
       "updatedAt",
     ]);
     expect(document.title).toBe("Third Friday review");
+    expect(document.color).toBe("blue");
     expect(document.startsAt.toDate()).toEqual(input.startsAt);
     expect(document.endsAt?.toDate()).toEqual(input.endsAt);
     expect(document.recurrence?.termination.until?.toDate()).toEqual(
@@ -110,6 +113,7 @@ describe("Firestore event decoding", () => {
     expect(event.kind).toBe("single");
     expect(event.startsAt).toEqual(new Date("2026-08-11T16:00:00.000Z"));
     expect(event.recurrence).toBeNull();
+    expect(event.color).toBe("mauve");
   });
 
   it.each([

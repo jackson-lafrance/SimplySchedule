@@ -203,6 +203,7 @@ function occurrenceFromStart(
     endsAt,
     allDay: event.allDay,
     timeZone: event.timeZone,
+    color: event.color,
     isRepeating: repeating,
   };
 }

@@ -21,11 +21,13 @@ const shortDateFormatter = new Intl.DateTimeFormat("en-US", {
 });
 
 export default function HomeView({
+  completeTask,
   occurrences,
   tasks,
   today,
   weekStartsOn,
 }: {
+  completeTask: (taskId: string) => Promise<void>;
   occurrences: EventOccurrence[];
   tasks: ScheduleTask[];
   today: Date;
@@ -38,12 +40,6 @@ export default function HomeView({
   const todayKey = localDateKey(today);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const currentDayRef = useRef<HTMLElement | null>(null);
-  const itemCount = days.reduce(
-    (count, { day, events }) =>
-      count + events.length + tasksForDate(tasks, day.date).length,
-    0,
-  );
-
   useEffect(() => {
     if (!window.matchMedia("(max-width: 720px)").matches) {
       return;
@@ -64,17 +60,15 @@ export default function HomeView({
   return (
     <div className="screen weekly-home-screen">
       <header className="screen-heading weekly-home-heading">
-        <p className="eyebrow">Current week</p>
         <h1>This week</h1>
         <p className="screen-summary">
           {shortDateFormatter.format(days[0].day.date)}–
-          {shortDateFormatter.format(days[days.length - 1].day.date)} · {itemCount}{" "}
-          {itemCount === 1 ? "ITEM" : "ITEMS"}
+          {shortDateFormatter.format(days[days.length - 1].day.date)}
         </p>
       </header>
 
       <div
-        aria-label="Current week agenda"
+        aria-label="Weekly agenda"
         className="weekly-agenda-scroll"
         ref={scrollRef}
         role="region"
@@ -95,7 +89,11 @@ export default function HomeView({
                 ref={current ? currentDayRef : undefined}
               >
                 <h2>{sectionFormatter.format(day.date)}</h2>
-                <AgendaRows events={events} tasks={dayTasks} />
+                <AgendaRows
+                  events={events}
+                  onCompleteTask={completeTask}
+                  tasks={dayTasks}
+                />
               </section>
             );
           })}

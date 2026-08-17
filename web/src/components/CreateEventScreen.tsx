@@ -2,6 +2,12 @@ import { useMemo, useState, type FormEvent } from "react";
 
 import { useModalDialog } from "@/components/useModalDialog";
 import {
+  DEFAULT_EVENT_COLOR,
+  DEFAULT_TASK_COLOR,
+  SCHEDULE_COLORS,
+  type ScheduleColor,
+} from "@/domain/colors";
+import {
   createEventInputFromDraft,
   previewEventOccurrences,
   recurrenceSummary,
@@ -11,6 +17,8 @@ import {
   type RepeatFrequency,
 } from "@/domain/eventForm";
 import type { CreateEventInput, RecurrenceTerminationType } from "@/domain/events";
+import { createTaskInputFromDraft } from "@/domain/taskForm";
+import type { CreateTaskInput } from "@/domain/tasks";
 
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
 const MONTHS = [
@@ -41,6 +49,7 @@ function initialDraft(date: string): EventDraft {
     startTime: "09:00",
     endTime: "10:00",
     allDay: false,
+    color: DEFAULT_EVENT_COLOR,
     repeatFrequency: "none",
     interval: "1",
     daysOfWeek: [weekdayForDateKey(date)],
@@ -53,6 +62,36 @@ function initialDraft(date: string): EventDraft {
     untilDate: date,
     occurrenceCount: "10",
   };
+}
+
+function ColorPicker({
+  value,
+  onChange,
+}: {
+  value: ScheduleColor;
+  onChange: (value: ScheduleColor) => void;
+}) {
+  return (
+    <fieldset className="color-picker">
+      <legend>Color</legend>
+      <div>
+        {SCHEDULE_COLORS.map((color) => (
+          <label key={color.key} title={color.label}>
+            <input
+              aria-label={color.label}
+              checked={value === color.key}
+              name="schedule-color"
+              onChange={() => onChange(color.key)}
+              type="radio"
+            />
+            <span style={{ backgroundColor: color.value }}>
+              {value === color.key ? "✓" : ""}
+            </span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
 }
 
 function DiscardChangesDialog({
@@ -83,10 +122,10 @@ function DiscardChangesDialog({
         role="dialog"
         tabIndex={-1}
       >
-        <p className="eyebrow">Unsaved event</p>
+        <p className="eyebrow">Unsaved changes</p>
         <h2 id="discard-title">Discard changes?</h2>
         <p id="discard-description">
-          Your event details have not been saved.
+          Your schedule item has not been saved.
         </p>
         <div className="discard-actions">
           <button
@@ -113,20 +152,24 @@ function DiscardChangesDialog({
 export default function CreateEventScreen({
   initialDate,
   onCancel,
-  onSave,
+  onSaveEvent,
+  onSaveTask,
 }: {
   initialDate: string;
   onCancel: () => void;
-  onSave: (event: CreateEventInput) => Promise<void>;
+  onSaveEvent: (event: CreateEventInput) => Promise<void>;
+  onSaveTask: (task: CreateTaskInput) => Promise<void>;
 }) {
   const [initialValues] = useState(() => initialDraft(initialDate));
+  const [mode, setMode] = useState<"event" | "task">("event");
   const [draft, setDraft] = useState(initialValues);
   const [showMore, setShowMore] = useState(false);
   const [saving, setSaving] = useState(false);
   const [discarding, setDiscarding] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const timeZone = browserTimeZone();
-  const dirty = JSON.stringify(draft) !== JSON.stringify(initialValues);
+  const dirty =
+    mode !== "event" || JSON.stringify(draft) !== JSON.stringify(initialValues);
   const requestCancel = () => {
     if (saving) {
       return;
@@ -143,6 +186,14 @@ export default function CreateEventScreen({
     field: Field,
     value: EventDraft[Field],
   ) => setDraft((current) => ({ ...current, [field]: value }));
+
+  const selectMode = (nextMode: "event" | "task") => {
+    setMode(nextMode);
+    update(
+      "color",
+      nextMode === "task" ? DEFAULT_TASK_COLOR : DEFAULT_EVENT_COLOR,
+    );
+  };
 
   const selectDate = (date: string) => {
     setDraft((current) => {
@@ -189,25 +240,36 @@ export default function CreateEventScreen({
     setErrorMessage(null);
 
     try {
-      const event = createEventInputFromDraft(draft, timeZone);
       setSaving(true);
-      await onSave(event);
+      if (mode === "task") {
+        await onSaveTask(
+          createTaskInputFromDraft({
+            title: draft.title,
+            notes: draft.notes,
+            date: draft.date,
+            time: draft.startTime,
+            color: draft.color,
+          }),
+        );
+      } else {
+        await onSaveEvent(createEventInputFromDraft(draft, timeZone));
+      }
     } catch (error) {
       setSaving(false);
       setErrorMessage(
         error instanceof Error
           ? error.message
-          : "THE EVENT COULD NOT BE SAVED. TRY AGAIN.",
+          : "THE SCHEDULE ITEM COULD NOT BE SAVED. TRY AGAIN.",
       );
     }
   };
 
-  const repeats = draft.repeatFrequency !== "none";
+  const repeats = mode === "event" && draft.repeatFrequency !== "none";
   const usesCalendarPattern =
     draft.repeatFrequency === "monthly" ||
     draft.repeatFrequency === "yearly";
   const previewDates = useMemo(() => {
-    if (!repeats) {
+    if (mode !== "event" || !repeats) {
       return [];
     }
     try {
@@ -219,7 +281,7 @@ export default function CreateEventScreen({
     } catch {
       return [];
     }
-  }, [draft, repeats, timeZone]);
+  }, [draft, mode, repeats, timeZone]);
   const previewFormatter = useMemo(
     () =>
       new Intl.DateTimeFormat("en-US", {
@@ -244,7 +306,7 @@ export default function CreateEventScreen({
       role="presentation"
     >
       <section
-        aria-labelledby="create-event-title"
+        aria-labelledby="create-schedule-title"
         aria-modal="true"
         className="create-event-sheet"
         ref={dialogRef}
@@ -252,12 +314,9 @@ export default function CreateEventScreen({
         tabIndex={-1}
       >
         <div className="sheet-header">
-          <div>
-            <p className="eyebrow">New schedule entry</p>
-            <h2 id="create-event-title">New event</h2>
-          </div>
+          <h2 id="create-schedule-title">New schedule</h2>
           <button
-            aria-label="Close event editor"
+            aria-label="Close schedule editor"
             className="plain-icon-button"
             disabled={saving}
             onClick={requestCancel}
@@ -269,13 +328,27 @@ export default function CreateEventScreen({
 
         <form className="event-form" onSubmit={submit}>
           <div className="form-scroll">
+            <div aria-label="Schedule type" className="mode-switcher" role="group">
+              {(["event", "task"] as const).map((option) => (
+                <button
+                  aria-pressed={mode === option}
+                  className={mode === option ? "mode-active" : ""}
+                  key={option}
+                  onClick={() => selectMode(option)}
+                  type="button"
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+
             <label className="form-field form-field-wide title-field">
               <span>Title</span>
               <input
                 data-initial-focus
                 maxLength={200}
                 onChange={(event) => update("title", event.target.value)}
-                placeholder="WHAT IS HAPPENING?"
+                placeholder={mode === "task" ? "WHAT NEEDS DOING?" : "WHAT IS HAPPENING?"}
                 required
                 type="text"
                 value={draft.title}
@@ -284,7 +357,7 @@ export default function CreateEventScreen({
 
             <div className="quick-fields">
               <label className="form-field">
-                <span>Start anchor</span>
+                <span>{mode === "task" ? "Due date" : "Start date"}</span>
                 <input
                   onChange={(event) => selectDate(event.target.value)}
                   required
@@ -292,17 +365,31 @@ export default function CreateEventScreen({
                   value={draft.date}
                 />
               </label>
-              <label className="toggle-field">
-                <input
-                  checked={draft.allDay}
-                  onChange={(event) => update("allDay", event.target.checked)}
-                  type="checkbox"
-                />
-                <span>All day</span>
-              </label>
+              {mode === "event" ? (
+                <label className="toggle-field">
+                  <input
+                    checked={draft.allDay}
+                    onChange={(event) => update("allDay", event.target.checked)}
+                    type="checkbox"
+                  />
+                  <span>All day</span>
+                </label>
+              ) : null}
             </div>
 
-            {!draft.allDay ? (
+            {mode === "task" ? (
+              <div className="quick-fields">
+                <label className="form-field">
+                  <span>Due time</span>
+                  <input
+                    onChange={(event) => update("startTime", event.target.value)}
+                    required
+                    type="time"
+                    value={draft.startTime}
+                  />
+                </label>
+              </div>
+            ) : !draft.allDay ? (
               <div className="quick-fields">
                 <label className="form-field">
                   <span>Starts</span>
@@ -325,14 +412,14 @@ export default function CreateEventScreen({
               </div>
             ) : null}
 
-            <section className="repeat-builder" aria-labelledby="repeat-title">
-              <div className="form-section-heading">
-                <div>
-                  <p className="eyebrow">Optional</p>
+            <ColorPicker value={draft.color} onChange={(color) => update("color", color)} />
+
+            {mode === "event" ? (
+              <section className="repeat-builder" aria-labelledby="repeat-title">
+                <div className="form-section-heading">
                   <h3 id="repeat-title">Repeat</h3>
+                  {repeats ? <span className="repeat-glyph">↻</span> : null}
                 </div>
-                {repeats ? <span className="repeat-glyph">↻</span> : null}
-              </div>
 
               <div className="repeat-frequency-row">
                 {repeats ? (
@@ -486,7 +573,6 @@ export default function CreateEventScreen({
                 <>
                   <div className="repeat-summary" role="status">
                     <strong>{recurrenceSummary(draft)}</strong>
-                    <small>Anchored {draft.date} · {timeZone}</small>
                   </div>
                   {previewDates.length > 0 ? (
                     <div className="occurrence-preview">
@@ -552,7 +638,8 @@ export default function CreateEventScreen({
                   </div>
                 </>
               ) : null}
-            </section>
+              </section>
+            ) : null}
 
             <button
               aria-expanded={showMore}
@@ -575,10 +662,6 @@ export default function CreateEventScreen({
                     value={draft.notes}
                   />
                 </label>
-                <p className="timezone-note">
-                  <strong>TIMEZONE</strong>
-                  <span>{timeZone}. Calendar recurrence stays at local wall time across DST.</span>
-                </p>
               </section>
             ) : null}
 
@@ -597,7 +680,7 @@ export default function CreateEventScreen({
               Cancel
             </button>
             <button className="primary-button" disabled={saving} type="submit">
-              {saving ? "Saving…" : "Save event"}
+              {saving ? "Saving…" : `Save ${mode}`}
             </button>
           </div>
         </form>

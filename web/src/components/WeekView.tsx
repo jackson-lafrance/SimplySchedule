@@ -9,10 +9,12 @@ const dateFormatter = new Intl.DateTimeFormat("en-US", {
 });
 
 export default function WeekView({
+  completeTask,
   days,
   tasks,
   onSelectDay,
 }: {
+  completeTask: (taskId: string) => Promise<void>;
   days: AgendaDay[];
   tasks: ScheduleTask[];
   onSelectDay: (date: Date) => void;
@@ -35,6 +37,7 @@ export default function WeekView({
           </button>
           <AgendaRows
             events={events}
+            onCompleteTask={completeTask}
             tasks={tasksForDate(tasks, day.date)}
           />
         </section>

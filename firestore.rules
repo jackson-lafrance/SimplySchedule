@@ -34,9 +34,9 @@ service cloud.firestore {
           'dueAt',
           'completedAt',
           'position',
+          'color',
           'createdAt',
-          'updatedAt',
-          'color'
+          'updatedAt'
         ])
         && (!data.keys().hasAny(['color']) || validScheduleColor(data.color))
         && data.title is string
@@ -196,10 +196,10 @@ service cloud.firestore {
           'endsAt',
           'allDay',
           'timeZone',
+          'color',
           'recurrence',
           'createdAt',
-          'updatedAt',
-          'color'
+          'updatedAt'
         ])
         && (!data.keys().hasAny(['color']) || validScheduleColor(data.color))
         && data.title is string

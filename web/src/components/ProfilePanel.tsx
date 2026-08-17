@@ -47,7 +47,6 @@ export default function ProfilePanel({
           </button>
         </div>
         <div className="profile-content">
-          <span className={`profile-status profile-status-${status}`} aria-hidden="true" />
           <p className="eyebrow">Schedule data</p>
           <strong>
             {source === "firebase" ? "FIREBASE SYNC" : "LOCAL PREVIEW"}
