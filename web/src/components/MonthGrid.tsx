@@ -1,3 +1,10 @@
+import { type CSSProperties } from "react";
+
+import {
+  DEFAULT_EVENT_COLOR,
+  DEFAULT_TASK_COLOR,
+  scheduleColorValue,
+} from "@/domain/colors";
 import {
   eventsForDate,
   tasksForDate,
@@ -47,9 +54,21 @@ export default function MonthGrid({
         role="region"
       >
         {days.map((day) => {
-          const count =
-            eventsForDate(events, day.date).length +
-            tasksForDate(tasks, day.date).length;
+          const dayEvents = eventsForDate(events, day.date);
+          const dayTasks = tasksForDate(tasks, day.date);
+          const dayItems = [
+            ...dayEvents.map((item) => ({
+              kind: "event" as const,
+              color: scheduleColorValue(item.color, DEFAULT_EVENT_COLOR),
+              id: `event-${item.id}`,
+            })),
+            ...dayTasks.map((item) => ({
+              kind: "task" as const,
+              color: scheduleColorValue(item.color, DEFAULT_TASK_COLOR),
+              id: `task-${item.id}`,
+            })),
+          ];
+          const count = dayItems.length;
           const selected = selectedKey === day.key;
 
           return (
@@ -68,6 +87,18 @@ export default function MonthGrid({
               type="button"
             >
               <span className="day-number">{day.dayNumber}</span>
+              <span className="calendar-day-markers" aria-hidden="true">
+                {dayItems.slice(0, 4).map((item) => (
+                  <span
+                    className={`calendar-day-marker calendar-day-marker-${item.kind}`}
+                    key={item.id}
+                    style={{ "--marker-color": item.color.value } as CSSProperties}
+                  />
+                ))}
+                {count > 4 ? (
+                  <span className="calendar-day-more">+{count - 4}</span>
+                ) : null}
+              </span>
               {day.isToday ? (
                 <span className="calendar-today-dot" aria-hidden="true" />
               ) : null}

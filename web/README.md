@@ -61,7 +61,7 @@ From the repository root, start Auth and Firestore:
 npx firebase-tools emulators:start --only auth,firestore
 ```
 
-Then run `npm run dev` from `web/`. When the initial anonymous user's visible collection is empty, `VITE_FIREBASE_SEED_EMULATOR=true` writes the four minimal preview events. Seeding is guarded by emulator mode and happens at most once per app session.
+Then run `npm run dev` from `web/`. When the initial anonymous user's visible collections are empty, `VITE_FIREBASE_SEED_EMULATOR=true` writes the minimal preview events and tasks. Seeding is guarded by emulator mode and happens at most once per app session.
 
 ## Verification
 

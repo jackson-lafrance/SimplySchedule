@@ -146,6 +146,49 @@ test("creates and completes colored tasks from the weekly agenda", async ({
   await expect(row).toHaveCount(0);
 });
 
+test("keeps completion controls in day and month agenda projections", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await createTask(page, "Cross-view task");
+
+  await page.getByRole("button", { name: "calendar", exact: true }).click();
+  await page.getByRole("button", { name: "day", exact: true }).click();
+  const dayRow = page.locator(".day-view .agenda-row-task").filter({
+    hasText: "Cross-view task",
+  });
+  await expect(dayRow).toBeVisible();
+  await dayRow
+    .getByRole("button", { name: "Mark Cross-view task complete" })
+    .click();
+  await expect(dayRow).toHaveCount(0);
+
+  await page.getByRole("button", { name: "+ SCHEDULE" }).click();
+  await page
+    .getByRole("group", { name: "Schedule type" })
+    .getByRole("button", { name: "task" })
+    .click();
+  await page.getByLabel("Title").fill("Month task");
+  await page.getByLabel("Due date").fill(localDateKey());
+  await page.getByLabel("Due time").fill("15:30");
+  await page.getByRole("button", { name: "Save task" }).click();
+  await expect(page.getByText("TASK SAVED.", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "calendar", exact: true }).click();
+  await page.getByRole("button", { name: "month", exact: true }).click();
+  const monthRow = page.locator(".month-selected-day .agenda-row-task").filter({
+    hasText: "Month task",
+  });
+  await expect(monthRow).toBeVisible();
+  await expect(
+    page.locator(".calendar-day-selected .calendar-day-marker-task"),
+  ).toHaveCount(2);
+  await monthRow
+    .getByRole("button", { name: "Mark Month task complete" })
+    .click();
+  await expect(monthRow).toHaveCount(0);
+});
+
 test("creates an event quickly and discloses expressive recurrence", async ({ page }) => {
   await page.goto("/");
 

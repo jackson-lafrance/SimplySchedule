@@ -257,7 +257,6 @@ export default function App() {
           type="button"
         >
           <Icon name="profile" />
-          <span>Profile</span>
         </button>
       </header>
 
@@ -315,11 +314,7 @@ export default function App() {
           {activeSection === "calendar" ? (
             <div className="screen calendar-screen">
               <header className="screen-heading calendar-screen-heading">
-                <div>
-                  <p className="eyebrow">Your schedule</p>
-                  <h1>Calendar</h1>
-                  <p className="screen-summary">DAY, WEEK, OR MONTH. NOTHING EXTRA.</p>
-                </div>
+                <h1>Calendar</h1>
                 <div
                   aria-label="Calendar view"
                   className="view-switcher"
@@ -370,14 +365,9 @@ export default function App() {
 
                 {calendarView === "day" ? (
                   <div className="day-view">
-                    <div className="section-heading">
-                      <div>
-                        <p className="eyebrow">Agenda</p>
-                        <h2>{fullDateFormatter.format(selectedDate)}</h2>
-                      </div>
-                    </div>
                     <AgendaRows
                       events={selectedEvents}
+                      onCompleteTask={completeTask}
                       tasks={selectedTasks}
                     />
                   </div>
@@ -407,13 +397,11 @@ export default function App() {
                     />
                     <section className="month-selected-day">
                       <div className="section-heading">
-                        <div>
-                          <p className="eyebrow">Selected day</p>
-                          <h2>{fullDateFormatter.format(selectedDate)}</h2>
-                        </div>
+                        <h2>{fullDateFormatter.format(selectedDate)}</h2>
                       </div>
                       <AgendaRows
                         events={selectedEvents}
+                        onCompleteTask={completeTask}
                         tasks={selectedTasks}
                       />
                     </section>

@@ -122,13 +122,6 @@ h3 {
   height: 27px;
 }
 
-.profile-control > span {
-  margin-top: 2px;
-  font-size: 10px;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
 .sync-dot {
   display: inline-block;
   width: 8px;
@@ -715,6 +708,46 @@ h3 {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 11px;
   font-weight: 900;
+}
+
+.calendar-day-markers {
+  display: flex;
+  min-height: 8px;
+  max-width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  margin-top: 2px;
+  overflow: hidden;
+}
+
+.calendar-day-marker {
+  display: block;
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border: 1px solid var(--marker-color);
+  background: var(--marker-color);
+}
+
+.calendar-day-marker-event {
+  border-radius: 50%;
+}
+
+.calendar-day-marker-task {
+  border-radius: 2px;
+}
+
+.calendar-day-more {
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 8px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.calendar-day-selected .calendar-day-more {
+  color: var(--canvas);
 }
 
 .calendar-today-dot {
@@ -1578,10 +1611,6 @@ h3 {
 }
 
 @media (max-width: 420px) {
-  .profile-control > span {
-    display: none;
-  }
-
   .profile-control {
     min-width: 44px;
   }

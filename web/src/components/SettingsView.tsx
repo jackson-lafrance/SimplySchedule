@@ -25,9 +25,7 @@ export default function SettingsView({
   return (
     <div className="screen settings-screen">
       <header className="screen-heading">
-        <p className="eyebrow">Simply Schedule</p>
         <h1>Settings</h1>
-        <p className="screen-summary">A FEW USEFUL DEFAULTS.</p>
       </header>
 
       <div className="settings-list">

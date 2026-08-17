@@ -25,6 +25,7 @@ import {
 import {
   completeTask as persistTaskCompletion,
   createTask as persistTask,
+  seedEmulatorTasks,
   subscribeToTasksInRange,
 } from "@/services/taskRepository";
 
@@ -110,6 +111,17 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
         lastUpdatedAt: scheduleReady ? new Date() : current.lastUpdatedAt,
       }));
     };
+    const seedEmulatorSchedule = (userId: string) => {
+      if (!configuredClient.seedEmulator || seededEmulatorRef.current) {
+        return false;
+      }
+      seededEmulatorRef.current = true;
+      void Promise.all([
+        seedEmulatorEvents(configuredClient.db, userId, createDemoEvents()),
+        seedEmulatorTasks(configuredClient.db, userId, createDemoTasks()),
+      ]).catch(fail);
+      return true;
+    };
 
     void getOrCreateScheduleUser(configuredClient.auth)
       .then((user) => {
@@ -124,17 +136,7 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
             user.uid,
             visibleRange,
             (events) => {
-              if (
-                configuredClient.seedEmulator &&
-                events.length === 0 &&
-                !seededEmulatorRef.current
-              ) {
-                seededEmulatorRef.current = true;
-                void seedEmulatorEvents(
-                  configuredClient.db,
-                  user.uid,
-                  createDemoEvents(),
-                ).catch(fail);
+              if (events.length === 0 && seedEmulatorSchedule(user.uid)) {
                 return;
               }
               markReady("events", events);
@@ -145,7 +147,12 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
             configuredClient.db,
             user.uid,
             visibleRange,
-            (tasks) => markReady("tasks", tasks),
+            (tasks) => {
+              if (tasks.length === 0 && seedEmulatorSchedule(user.uid)) {
+                return;
+              }
+              markReady("tasks", tasks);
+            },
             fail,
           ),
         );

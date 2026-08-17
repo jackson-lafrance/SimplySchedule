@@ -8,6 +8,7 @@ import {
   setDoc,
   Timestamp,
   updateDoc,
+  writeBatch,
   where,
   type DocumentData,
   type Firestore,
@@ -161,4 +162,33 @@ export async function completeTask(
     completedAt,
     updatedAt: completedAt,
   });
+}
+
+/** Writes development-only preview tasks for an empty emulator user. */
+export async function seedEmulatorTasks(
+  db: Firestore,
+  userId: string,
+  tasks: ScheduleTask[],
+) {
+  const batch = writeBatch(db);
+
+  tasks.forEach((task) => {
+    if (!task.dueAt) {
+      return;
+    }
+    const document = encodeCreateTaskDocument(
+      {
+        title: task.title,
+        notes: task.notes,
+        dueAt: task.dueAt,
+        color: task.color ?? DEFAULT_TASK_COLOR,
+      },
+      Timestamp.fromDate(task.createdAt),
+      task.position,
+    );
+    document.updatedAt = Timestamp.fromDate(task.updatedAt);
+    batch.set(doc(db, "users", userId, "tasks", task.id), document);
+  });
+
+  await batch.commit();
 }
