@@ -17,6 +17,7 @@ import {
 } from "@/domain/calendar";
 import { AGENDA_ROW_LAYOUT } from "@/domain/agendaRowLayout";
 import type { EventOccurrence } from "@/domain/events";
+import { DONE_BUTTON_PRESSED_STYLE } from "@/domain/interactionStyles";
 import type { TimeDisplay } from "@/domain/preferences";
 import {
   scheduleColorTextValue,
@@ -350,7 +351,7 @@ export default function AgendaList({
                 onPress={closeDetails}
                 style={({ pressed }) => [
                   styles.doneButton,
-                  pressed && styles.pressed,
+                  pressed && styles.donePressed,
                   completingTaskId !== null && styles.disabled,
                 ]}
               >
@@ -565,6 +566,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginTop: spacing.sm,
   },
+  donePressed: DONE_BUTTON_PRESSED_STYLE,
   doneText: {
     color: colors.ink,
     fontSize: 14,
