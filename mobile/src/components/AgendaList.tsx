@@ -15,6 +15,7 @@ import {
   localDateKey,
   tasksForDate,
 } from "@/domain/calendar";
+import { AGENDA_ROW_LAYOUT } from "@/domain/agendaRowLayout";
 import type { EventOccurrence } from "@/domain/events";
 import type { TimeDisplay } from "@/domain/preferences";
 import {
@@ -139,12 +140,13 @@ export default function AgendaList({
     return (
       <View
         key={`${keyPrefix}${selectedItem.type}-${item.id}`}
-        style={[
-          styles.item,
-          taskCompleted && styles.completedItem,
-          { borderLeftColor: accentColor },
-        ]}
+        style={[styles.item, taskCompleted && styles.completedItem]}
       >
+        <View
+          accessibilityElementsHidden
+          pointerEvents="none"
+          style={[styles.colorRail, { backgroundColor: accentColor }]}
+        />
         {selectedItem.type === "task" ? (
           <Pressable
             accessibilityLabel={
@@ -387,14 +389,18 @@ const styles = StyleSheet.create({
   },
   item: {
     minHeight: 72,
-    borderWidth: 2,
+    borderWidth: AGENDA_ROW_LAYOUT.borderWidth,
     borderColor: colors.ink,
     borderRadius: radii.card,
     backgroundColor: colors.background,
     flexDirection: "row",
     alignItems: "stretch",
-    borderLeftWidth: 8,
     overflow: "hidden",
+  },
+  colorRail: {
+    width: AGENDA_ROW_LAYOUT.accentRailWidth,
+    alignSelf: "stretch",
+    flexShrink: 0,
   },
   completedItem: {
     backgroundColor: colors.surfaceMuted,
