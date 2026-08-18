@@ -66,7 +66,7 @@ export default function AgendaList({
   events,
   tasks,
   timeDisplay,
-  onCompleteTask,
+  onToggleTask,
   sectioned = false,
   currentDate,
   onCurrentDateLayout,
@@ -75,7 +75,7 @@ export default function AgendaList({
   events: EventOccurrence[];
   tasks: ScheduleTask[];
   timeDisplay: TimeDisplay;
-  onCompleteTask: (taskId: string) => Promise<void>;
+  onToggleTask: (taskId: string, completed: boolean) => Promise<void>;
   sectioned?: boolean;
   currentDate?: Date;
   onCurrentDateLayout?: (offset: number) => void;
@@ -105,18 +105,19 @@ export default function AgendaList({
     setActionError(null);
     setSelected(null);
   };
-  const completeTask = async (task: ScheduleTask) => {
+  const toggleTask = async (task: ScheduleTask) => {
+    const completed = task.status === "completed";
     setActionError(null);
     setCompletingTaskId(task.id);
     try {
-      await onCompleteTask(task.id);
+      await onToggleTask(task.id, !completed);
       if (selected?.type === "task" && selected.item.id === task.id) {
         setSelected(null);
       }
     } catch (error) {
-      console.error("Could not complete task", error);
+      console.error("Could not update task completion", error);
       setSelected({ type: "task", item: task });
-      setActionError("THE TASK COULD NOT BE COMPLETED. TRY AGAIN.");
+      setActionError("THE TASK COULD NOT BE UPDATED. TRY AGAIN.");
     } finally {
       setCompletingTaskId(null);
     }
@@ -150,17 +151,19 @@ export default function AgendaList({
         {selectedItem.type === "task" ? (
           <Pressable
             accessibilityLabel={
-              taskCompleted ? `${item.title}, completed` : `Complete ${item.title}`
+              taskCompleted
+                ? `Mark ${item.title} incomplete`
+                : `Complete ${item.title}`
             }
             accessibilityRole="checkbox"
             accessibilityState={{
               busy: completing,
               checked: taskCompleted,
-              disabled: taskCompleted || completing,
+              disabled: completing,
             }}
-            disabled={taskCompleted || completing}
+            disabled={completing}
             hitSlop={4}
-            onPress={() => void completeTask(selectedItem.item)}
+            onPress={() => void toggleTask(selectedItem.item)}
             style={({ pressed }) => [
               styles.checkButton,
               pressed && styles.pressed,
@@ -315,7 +318,7 @@ export default function AgendaList({
                   {actionError}
                 </Text>
               ) : null}
-              {selected.type === "task" && selected.item.status === "open" ? (
+              {selected.type === "task" ? (
                 <Pressable
                   accessibilityRole="button"
                   accessibilityState={{
@@ -323,7 +326,7 @@ export default function AgendaList({
                     disabled: completingTaskId === selected.item.id,
                   }}
                   disabled={completingTaskId === selected.item.id}
-                  onPress={() => void completeTask(selected.item)}
+                  onPress={() => void toggleTask(selected.item)}
                   style={({ pressed }) => [
                     styles.primaryButton,
                     pressed && styles.primaryPressed,
@@ -333,7 +336,11 @@ export default function AgendaList({
                   {completingTaskId === selected.item.id ? (
                     <ActivityIndicator color={colors.inverse} />
                   ) : (
-                    <Text style={styles.primaryText}>MARK COMPLETE</Text>
+                    <Text style={styles.primaryText}>
+                      {selected.item.status === "completed"
+                        ? "MARK INCOMPLETE"
+                        : "MARK COMPLETE"}
+                    </Text>
                   )}
                 </Pressable>
               ) : null}

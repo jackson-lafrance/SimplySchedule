@@ -149,15 +149,24 @@ export async function createTask(
   return reference.id;
 }
 
+export async function setTaskCompletion(
+  db: Firestore,
+  userId: string,
+  taskId: string,
+  completed: boolean,
+) {
+  const updatedAt = serverTimestamp();
+  await updateDoc(doc(db, "users", userId, "tasks", taskId), {
+    status: completed ? "completed" : "open",
+    completedAt: completed ? updatedAt : null,
+    updatedAt,
+  });
+}
+
 export async function completeTask(
   db: Firestore,
   userId: string,
   taskId: string,
 ) {
-  const completedAt = serverTimestamp();
-  await updateDoc(doc(db, "users", userId, "tasks", taskId), {
-    status: "completed",
-    completedAt,
-    updatedAt: completedAt,
-  });
+  await setTaskCompletion(db, userId, taskId, true);
 }

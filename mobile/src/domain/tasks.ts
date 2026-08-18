@@ -30,3 +30,16 @@ export type TaskDraft = {
   date: string;
   time: string;
 };
+
+export function setTaskCompletion(
+  task: ScheduleTask,
+  completed: boolean,
+  changedAt: Date,
+): ScheduleTask {
+  return {
+    ...task,
+    status: completed ? "completed" : "open",
+    completedAt: completed ? changedAt : null,
+    updatedAt: changedAt,
+  };
+}

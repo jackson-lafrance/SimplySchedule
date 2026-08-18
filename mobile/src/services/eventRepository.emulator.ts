@@ -26,6 +26,7 @@ import {
 import {
   completeTask,
   createTask,
+  setTaskCompletion,
   subscribeToTasksInRange,
 } from "@/services/taskRepository";
 
@@ -307,6 +308,48 @@ test("persists tasks and flexible events through shared emulators", async () => 
     assert.equal(
       completedVisibleTasks.find((task) => task.id === taskId)?.status,
       "completed",
+    );
+
+    await setTaskCompletion(db, user.uid, taskId, false);
+    const reopenedTasks = await getDocs(
+      collection(db, "users", user.uid, "tasks"),
+    );
+    assert.equal(reopenedTasks.docs[0].data().status, "open");
+    assert.equal(reopenedTasks.docs[0].data().completedAt, null);
+
+    const reopenedVisibleTasks = await new Promise<ScheduleTask[]>(
+      (resolve, reject) => {
+        let unsubscribe: (() => void) | undefined;
+        const timeout = setTimeout(() => {
+          unsubscribe?.();
+          reject(new Error("Timed out waiting for reopened task snapshots."));
+        }, 10_000);
+        unsubscribe = subscribeToTasksInRange(
+          db,
+          user.uid,
+          range,
+          (tasks) => {
+            if (
+              tasks.some(
+                (task) => task.id === taskId && task.status === "open",
+              )
+            ) {
+              clearTimeout(timeout);
+              unsubscribe?.();
+              resolve(tasks);
+            }
+          },
+          (error) => {
+            clearTimeout(timeout);
+            unsubscribe?.();
+            reject(error);
+          },
+        );
+      },
+    );
+    assert.equal(
+      reopenedVisibleTasks.find((task) => task.id === taskId)?.status,
+      "open",
     );
 
     const proofDay = {

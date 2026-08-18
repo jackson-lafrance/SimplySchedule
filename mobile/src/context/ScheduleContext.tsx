@@ -15,7 +15,10 @@ import { visibleRangeForMonth } from "@/domain/calendar";
 import { createDemoEvents } from "@/domain/demoEvents";
 import { createDemoTasks } from "@/domain/demoTasks";
 import type { CreateEventInput, VisibleRange } from "@/domain/events";
-import type { CreateTaskInput } from "@/domain/tasks";
+import {
+  setTaskCompletion as setTaskCompletionState,
+  type CreateTaskInput,
+} from "@/domain/tasks";
 import { getFirebaseClient, getOrCreateScheduleUser } from "@/lib/firebase";
 import {
   createEvent as persistEvent,
@@ -23,7 +26,7 @@ import {
   subscribeToEventsInRange,
 } from "@/services/eventRepository";
 import {
-  completeTask as persistTaskCompletion,
+  setTaskCompletion as persistTaskCompletion,
   createTask as persistTask,
   subscribeToTasksInRange,
 } from "@/services/taskRepository";
@@ -209,30 +212,33 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
     return persistTask(configuredClient.db, userIdRef.current, input);
   }, []);
 
-  const completeTask = useCallback(async (taskId: string) => {
-    if (!configuredClient) {
-      const now = new Date();
-      setState((current) => ({
-        ...current,
-        tasks: current.tasks.map((task) =>
-          task.id === taskId
-            ? {
-                ...task,
-                status: "completed",
-                completedAt: now,
-                updatedAt: now,
-              }
-            : task,
-        ),
-        lastUpdatedAt: now,
-      }));
-      return;
-    }
-    if (!userIdRef.current) {
-      throw new Error("THE SCHEDULE IS STILL CONNECTING. TRY AGAIN.");
-    }
-    await persistTaskCompletion(configuredClient.db, userIdRef.current, taskId);
-  }, []);
+  const toggleTaskCompletion = useCallback(
+    async (taskId: string, completed: boolean) => {
+      if (!configuredClient) {
+        const now = new Date();
+        setState((current) => ({
+          ...current,
+          tasks: current.tasks.map((task) =>
+            task.id === taskId
+              ? setTaskCompletionState(task, completed, now)
+              : task,
+          ),
+          lastUpdatedAt: now,
+        }));
+        return;
+      }
+      if (!userIdRef.current) {
+        throw new Error("THE SCHEDULE IS STILL CONNECTING. TRY AGAIN.");
+      }
+      await persistTaskCompletion(
+        configuredClient.db,
+        userIdRef.current,
+        taskId,
+        completed,
+      );
+    },
+    [],
+  );
 
   const retry = useCallback(() => {
     if (!configuredClient) return;
@@ -251,11 +257,11 @@ export function ScheduleProvider({ children }: { children: ReactNode }) {
       setVisibleRange,
       createEvent,
       createTask,
-      completeTask,
+      toggleTaskCompletion,
       retry,
     }),
     [
-      completeTask,
+      toggleTaskCompletion,
       createEvent,
       createTask,
       retry,

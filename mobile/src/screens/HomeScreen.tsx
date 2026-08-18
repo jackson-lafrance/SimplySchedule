@@ -17,7 +17,7 @@ export default function HomeScreen() {
   const {
     events: canonicalEvents,
     tasks,
-    completeTask,
+    toggleTaskCompletion,
     setVisibleRange,
   } = useSchedule();
   const { preferences } = usePreferences();
@@ -80,7 +80,7 @@ export default function HomeScreen() {
           currentDate={today}
           dates={dates}
           events={events}
-          onCompleteTask={completeTask}
+          onToggleTask={toggleTaskCompletion}
           onCurrentDateLayout={(offset) => {
             currentDayOffset.current = offset;
             scrollToCurrentDay();

@@ -24,7 +24,7 @@ export type ScheduleContextValue = ScheduleState & {
   setVisibleRange: (range: VisibleRange) => void;
   createEvent: (input: CreateEventInput) => Promise<string>;
   createTask: (input: CreateTaskInput) => Promise<string>;
-  completeTask: (taskId: string) => Promise<void>;
+  toggleTaskCompletion: (taskId: string, completed: boolean) => Promise<void>;
   retry: () => void;
 };
 

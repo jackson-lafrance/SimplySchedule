@@ -112,7 +112,7 @@ export default function CalendarScreen({
   const {
     events: canonicalEvents,
     tasks,
-    completeTask,
+    toggleTaskCompletion,
     setVisibleRange,
   } = useSchedule();
   const { preferences } = usePreferences();
@@ -232,7 +232,7 @@ export default function CalendarScreen({
         <AgendaList
           dates={[selectedDate]}
           events={events}
-          onCompleteTask={completeTask}
+          onToggleTask={toggleTaskCompletion}
           tasks={tasks}
           timeDisplay={preferences.timeDisplay}
         />

@@ -48,7 +48,7 @@ EXPO_PUBLIC_FIREBASE_USE_EMULATORS=true
 EXPO_PUBLIC_FIREBASE_SEED_EMULATOR=true
 ```
 
-The Simulator reaches host emulators at `127.0.0.1`. Event and task creation use generated document IDs, canonical shared fields, validated color IDs, and Firestore server timestamps. Completing a task preserves `createdAt` and sets server values for `completedAt` and `updatedAt`. Legacy/web documents without color remain readable with semantic defaults.
+The Simulator reaches host emulators at `127.0.0.1`. Event and task creation use generated document IDs, canonical shared fields, validated color IDs, and Firestore server timestamps. Toggling a task preserves `createdAt` and position, sets server values for `completedAt` when completed, and clears `completedAt` when reopened. Legacy/web documents without color remain readable with semantic defaults.
 
 Visible-range subscriptions cover due tasks (including completed items), point events, overlapping duration/all-day events, and repeating candidates. Completion preserves the task in its original agenda position with an explicit completed state. Recurrence expansion remains local, emits stable `<eventId>@<ISO-start>` keys, and is capped at 2,000 visible occurrences.
 
