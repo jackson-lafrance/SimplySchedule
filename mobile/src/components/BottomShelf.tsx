@@ -2,6 +2,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { PRIMARY_SCHEDULE_ACTION_LABEL } from "@/domain/navigationLabels";
 import { colors, radii, spacing } from "@/theme";
 
 export type PrimaryTab = "home" | "calendar" | "settings";
@@ -45,7 +46,7 @@ export default function BottomShelf({
           numberOfLines={1}
           style={styles.addText}
         >
-          + schedule
+          {PRIMARY_SCHEDULE_ACTION_LABEL}
         </Text>
       </Pressable>
 

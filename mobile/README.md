@@ -7,7 +7,7 @@ The mobile app is an Expo/React Native agenda, task, and calendar client designe
 - **Home** — the current week as vertically scrolling date sections, positioned on today when opened.
 - **Calendar** — restrained day, week, and month selection followed by the selected day's schedule.
 - **Settings** — only week start, default calendar view, and 12/24-hour display.
-- **+ schedule** — the single full-width primary action, matching SimplyLift's Start Workout placement and behavior.
+- **+ SCHEDULE** — the single full-width primary action, matching SimplyLift's Start Workout placement and behavior.
 
 Task and event rows expose only a name plus essential timing, with a selectable Neovim-inspired color persisted as a stable Firebase palette ID. Tasks can be completed directly from the weekly agenda. Tapping the row opens its details card. Quick task creation needs a title and due time. Quick event creation needs a title, date, and time. Notes, all-day behavior, and recurrence stay behind **More Options**, while repeating events retain a compact preview of upcoming dates.
 

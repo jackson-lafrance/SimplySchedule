@@ -1,0 +1,1 @@
+export const PRIMARY_SCHEDULE_ACTION_LABEL = "+ SCHEDULE";
